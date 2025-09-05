@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Terms of Service - Panchakarma Portal{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-gradient text-white text-center py-4">
+                    <h2><i class="fas fa-file-contract me-2"></i>Terms of Service</h2>
+                    <p class="mb-0">Please read these terms carefully</p>
+                </div>
+                <div class="card-body p-5">
+                    <div class="mb-4">
+                        <p class="text-muted">Last updated: {{ current_date or "January 2024" }}</p>
+                    </div>
+
+                    <section class="mb-5">
+                        <h4 class="text-primary mb-3"><i class="fas fa-handshake me-2"></i>Agreement to Terms</h4>
+                        <p>By accessing and using the Panchakarma Therapy Management Portal, you agree to be bound by these Terms of Service and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using this service.</p>
+                    </section>
+
+                    <section class="mb-5">
+                        <h4 class="text-primary mb-3"><i class="fas fa-stethoscope me-2"></i>Medical Disclaimer</h4>
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Important:</strong> This portal is a management system and does not provide medical advice. Always consult qualified healthcare professionals for medical decisions.
+                        </div>
+                        <ul class="ms-3">
+                            <li>The portal facilitates appointment booking and treatment tracking</li>
+                            <li>All medical decisions must be made by qualified practitioners</li>
+                            <li>Emergency medical situations require immediate professional care</li>
+                            <li>Treatment outcomes may vary based on individual conditions</li>
+                        </ul>
+                    </section>
+
+                    <section class="mb-5">
+                        <h4 class="text-primary mb-3"><i class="fas fa-user-shield me-2"></i>User Responsibilities</h4>
+                        <h6>All Users:</h6>
+                        <ul class="ms-3">
+                            <li>Provide accurate and truthful information</li>
+                            <li>Maintain confidentiality of login credentials</li>
+                            <li>Use the portal only for legitimate healthcare purposes</li>
+                            <li>Respect privacy and confidentiality of others</li>
+                        </ul>
+                        
+                        <h6>Patients:</h6>
+                        <ul class="ms-3">
+                            <li>Provide complete and accurate medical history</li>
+                            <li>Attend scheduled appointments or cancel in advance</li>
+                            <li>Follow prescribed treatments and protocols</li>
+                            <li>Report any adverse reactions immediately</li>
+                        </ul>
+                        
+                        <h6>Healthcare Providers:</h6>
+                        <ul class="ms-3">
+                            <li>Maintain valid licenses and certifications</li>
+                            <li>Provide quality care according to professional standards</li>
+                            <li>Maintain accurate patient records</li>
+                            <li>Report any safety concerns promptly</li>
+                        </ul>
+                    </section>
+
+                    <section class="mb-5">
+                        <h4 class="text-primary mb-3"><i class="fas fa-ban me-2"></i>Prohibited Activities</h4>
+                        <ul class="ms-3">
+                            <li>Sharing login credentials with unauthorized persons</li>
+                            <li>Accessing or attempting to access others' accounts</li>
+                            <li>Providing false or misleading information</li>
+                            <li>Using the portal for commercial solicitation</li>
+                            <li>Attempting to disrupt or damage the system</li>
+                            <li>Violating any applicable laws or regulations</li>
+                        </ul>
+                    </section>
+
+                    <section class="mb-5">
+                        <h4 class="text-primary mb-3"><i class="fas fa-shield-alt me-2"></i>Data Protection & Privacy</h4>
+                        <ul class="ms-3">
+                            <li>We are committed to protecting your personal and health information</li>
+                            <li>Data is processed in accordance with applicable privacy laws</li>
+                            <li>Please review our Privacy Policy for detailed information</li>
+                            <li>You have rights regarding your personal data as outlined in our Privacy Policy</li>
+                        </ul>
+                    </section>
+
+                    <section class="mb-5">
+                        <h4 class="text-primary mb-3"><i class="fas fa-exclamation-circle me-2"></i>Limitation of Liability</h4>
+                        <p>The Ministry of Ayush and portal operators shall not be liable for:</p>
+                        <ul class="ms-3">
+                            <li>Medical outcomes or treatment results</li>
+                            <li>Decisions made by healthcare providers</li>
+                            <li>Technical interruptions or system downtime</li>
+                            <li>Loss of data due to technical issues</li>
+                            <li>Indirect, incidental, or consequential damages</li>
+                        </ul>
+                    </section>
+
+                    <section class="mb-5">
+                        <h4 class="text-primary mb-3"><i class="fas fa-gavel me-2"></i>Compliance & Regulations</h4>
+                        <ul class="ms-3">
+                            <li>All activities must comply with Indian healthcare regulations</li>
+                            <li>Centres must maintain valid NABH accreditation where applicable</li>
+                            <li>Practitioners must hold valid licenses and registrations</li>
+                            <li>Quality standards as per Ministry of Ayush guidelines must be followed</li>
+                        </ul>
+                    </section>
+
+                    <section class="mb-5">
+                        <h4 class="text-primary mb-3"><i class="fas fa-times-circle me-2"></i>Account Termination</h4>
+                        <p>We reserve the right to terminate accounts for:</p>
+                        <ul class="ms-3">
+                            <li>Violation of these terms of service</li>
+                            <li>Fraudulent or misleading information</li>
+                            <li>Misuse of the portal or its features</li>
+                            <li>Failure to maintain required certifications</li>
+                        </ul>
+                    </section>
+
+                    <section class="mb-5">
+                        <h4 class="text-primary mb-3"><i class="fas fa-edit me-2"></i>Changes to Terms</h4>
+                        <p>These terms may be updated periodically. Continued use of the portal after changes constitutes acceptance of the new terms. Users will be notified of significant changes via email or portal notifications.</p>
+                    </section>
+
+                    <section class="mb-5">
+                        <h4 class="text-primary mb-3"><i class="fas fa-phone me-2"></i>Contact Information</h4>
+                        <p>For questions about these terms or the portal:</p>
+                        <div class="ms-3">
+                            <p><strong>Email:</strong> support@panchakarma-portal.gov.in</p>
+                            <p><strong>Phone:</strong> +91-11-2345-6789</p>
+                            <p><strong>Address:</strong> Ministry of Ayush, Shastri Bhawan, New Delhi - 110001</p>
+                        </div>
+                    </section>
+
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Acknowledgment:</strong> By using this portal, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <a href="/auth/signup" class="btn btn-primary me-3">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Registration
+                        </a>
+                        <a href="/" class="btn btn-outline-primary">
+                            <i class="fas fa-home me-2"></i>Home
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

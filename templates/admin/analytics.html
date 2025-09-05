@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - Panchakarma Portal{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h4 class="mb-4">System Analytics</h4>
+    <div class="row mb-4">
+        <div class="col-md-3"><div class="card text-center"><div class="card-body"><h6>Patients</h6><h4>{{ stats.patients }}</h4></div></div></div>
+        <div class="col-md-3"><div class="card text-center"><div class="card-body"><h6>Centres</h6><h4>{{ stats.centres }}</h4></div></div></div>
+        <div class="col-md-3"><div class="card text-center"><div class="card-body"><h6>Doctors</h6><h4>{{ stats.doctors }}</h4></div></div></div>
+        <div class="col-md-3"><div class="card text-center"><div class="card-body"><h6>Appointments</h6><h4>{{ stats.appointments }}</h4></div></div></div>
+    </div>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Appointment Status</div>
+                <div class="card-body">
+                    <canvas id="apptStatusChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Average Feedback Rating</div>
+                <div class="card-body"><h2 class="mb-0">{{ avg_rating }}/5</h2></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('apptStatusChart');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Pending', 'Confirmed', 'Completed'],
+            datasets: [{
+                label: 'Appointments',
+                data: [{{ appt_status.pending_approval }}, {{ appt_status.confirmed }}, {{ appt_status.completed }}],
+                backgroundColor: ['#f0ad4e', '#5bc0de', '#5cb85c']
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+    });
+});
+</script>
+{% endblock %}
+

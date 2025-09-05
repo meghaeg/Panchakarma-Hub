@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Add Doctor - Panchakarma Portal{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-user-plus"></i> Add New Doctor</h4>
+                </div>
+                <div class="card-body">
+                    <form id="addDoctorForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="doctorName" class="form-label">Full Name *</label>
+                                <input type="text" class="form-control" id="doctorName" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email Address *</label>
+                                <input type="email" class="form-control" id="email" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Phone Number *</label>
+                                <input type="tel" class="form-control" id="phone" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="specialization" class="form-label">Specialization *</label>
+                                <select class="form-control" id="specialization" required>
+                                    <option value="">Select specialization...</option>
+                                    <option value="Panchakarma Specialist">Panchakarma Specialist</option>
+                                    <option value="Ayurvedic Physician">Ayurvedic Physician</option>
+                                    <option value="Kayachikitsa">Kayachikitsa (Internal Medicine)</option>
+                                    <option value="Shalya Tantra">Shalya Tantra (Surgery)</option>
+                                    <option value="Prasuti Tantra">Prasuti Tantra (Gynecology)</option>
+                                    <option value="Kaumarbhritya">Kaumarbhritya (Pediatrics)</option>
+                                    <option value="Shalakya Tantra">Shalakya Tantra (ENT & Ophthalmology)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="experience" class="form-label">Experience (Years) *</label>
+                                <input type="number" class="form-control" id="experience" min="0" max="50" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="qualification" class="form-label">Qualification *</label>
+                                <input type="text" class="form-control" id="qualification" placeholder="e.g., BAMS, MD (Ayurveda)" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="licenseNumber" class="form-label">License Number *</label>
+                                <input type="text" class="form-control" id="licenseNumber" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="password" class="form-label">Temporary Password *</label>
+                                <input type="password" class="form-control" id="password" required>
+                                <small class="form-text text-muted">Doctor can change this after first login</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Available Time Sessions *</label>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="session1" value="09:00-10:00" checked>
+                                        <label class="form-check-label" for="session1">09:00-10:00</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="session2" value="10:00-11:00" checked>
+                                        <label class="form-check-label" for="session2">10:00-11:00</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="session3" value="11:00-12:00" checked>
+                                        <label class="form-check-label" for="session3">11:00-12:00</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="session4" value="14:00-15:00" checked>
+                                        <label class="form-check-label" for="session4">14:00-15:00</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="session5" value="15:00-16:00" checked>
+                                        <label class="form-check-label" for="session5">15:00-16:00</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="session6" value="16:00-17:00" checked>
+                                        <label class="form-check-label" for="session6">16:00-17:00</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted">Select the time slots when this doctor is available for appointments</small>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('centre.dashboard') }}" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-user-plus"></i> Add Doctor
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('addDoctorForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Get selected time sessions
+        const selectedSessions = [];
+        document.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+            selectedSessions.push(checkbox.value);
+        });
+        
+        if (selectedSessions.length === 0) {
+            alert('Please select at least one time session');
+            return;
+        }
+        
+        const doctorData = {
+            name: document.getElementById('doctorName').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value,
+            specialization: document.getElementById('specialization').value,
+            experience: parseInt(document.getElementById('experience').value),
+            qualification: document.getElementById('qualification').value,
+            license_number: document.getElementById('licenseNumber').value,
+            password: document.getElementById('password').value,
+            available_sessions: selectedSessions
+        };
+        
+        try {
+            const response = await fetch('/centre/add-doctor', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(doctorData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('Doctor added successfully!');
+                window.location.href = '/centre/dashboard';
+            } else {
+                alert(result.message || 'Failed to add doctor');
+            }
+        } catch (error) {
+            console.error('Add doctor error:', error);
+            alert('Failed to add doctor. Please try again.');
+        }
+    });
+});
+</script>
+{% endblock %}
