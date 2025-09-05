@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+
+{% block title %}Patient Details - Panchakarma Portal{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h4><i class="fas fa-user-injured"></i> Patient Details</h4>
+                            <p class="mb-0 text-muted">{{ patient.name }} - {{ patient.patient_id }}</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="btn-group">
+                                <button class="btn btn-primary" onclick="recordVitals()">
+                                    <i class="fas fa-heartbeat"></i> Record Vitals
+                                </button>
+                                <button class="btn btn-success" onclick="addProgressNote()">
+                                    <i class="fas fa-notes-medical"></i> Add Progress
+                                </button>
+                                {% if appointment.status != 'completed' %}
+                                <button class="btn btn-warning" onclick="completeTherapy()">
+                                    <i class="fas fa-check-circle"></i> Complete
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Patient Information -->
+                    <div class="row mb-4">
+                        <div class="col-lg-8">
+                            <h5>Patient Information</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <td><strong>Name:</strong></td>
+                                            <td>{{ patient.name }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Age:</strong></td>
+                                            <td>{{ patient.age }} years</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Blood Group:</strong></td>
+                                            <td>{{ patient.blood_group or 'Not specified' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Phone:</strong></td>
+                                            <td>{{ patient.phone }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <td><strong>Email:</strong></td>
+                                            <td>{{ patient.email }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Address:</strong></td>
+                                            <td>{{ patient.address }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Health Issues:</strong></td>
+                                            <td>{{ patient.health_issues or 'None specified' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Current Medications:</strong></td>
+                                            <td>{{ patient.medications or 'None' }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <h5>Current Treatment</h5>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6>{{ appointment.therapy_type }}</h6>
+                                    <p class="mb-2"><strong>Start Date:</strong> {{ appointment.appointment_date if appointment.appointment_date else 'N/A' }}</p>
+                                    <p class="mb-2"><strong>Status:</strong> 
+                                        <span class="status-badge status-{{ appointment.status }}">{{ appointment.status.title() }}</span>
+                                    </p>
+                                    <p class="mb-0"><strong>Duration:</strong> {{ appointment.progress_notes|length }} days</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Previous Appointments -->
+                    {% if previous_appointments %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5>Previous Treatments</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Therapy</th>
+                                            <th>Duration</th>
+                                            <th>Status</th>
+                                            <th>Summary</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for prev_apt in previous_appointments %}
+                                        <tr>
+                                            <td>{{ prev_apt.appointment_date if prev_apt.appointment_date else 'N/A' }}</td>
+                                            <td>{{ prev_apt.therapy_type }}</td>
+                                            <td>{{ prev_apt.progress_notes|length }} days</td>
+                                            <td><span class="status-badge status-{{ prev_apt.status }}">{{ prev_apt.status.title() }}</span></td>
+                                            <td>
+                                                {% if prev_apt.therapy_summary %}
+                                                    <button class="btn btn-sm btn-outline-info" onclick="viewSummary('{{ prev_apt.appointment_id }}')">
+                                                        <i class="fas fa-eye"></i> View
+                                                    </button>
+                                                {% else %}
+                                                    <span class="text-muted">No summary</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Current Treatment Progress -->
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <h5>Treatment Progress</h5>
+                            {% if appointment.progress_notes %}
+                                <div class="timeline">
+                                    {% for note in appointment.progress_notes %}
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between">
+                                                <h6 class="card-title">
+                                                    Day {{ loop.index }}
+                                                    <span class="badge bg-primary ms-2">Score: {{ note.improvement_score or 'N/A' }}/10</span>
+                                                </h6>
+                                                <small class="text-muted">
+                                                    {{ note.date if note.date else 'N/A' }}
+                                                </small>
+                                            </div>
+                                            <p class="card-text">{{ note.notes or 'No notes available' }}</p>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-clipboard-list text-muted" style="font-size: 3rem;"></i>
+                                    <h5 class="mt-3 text-muted">No progress notes yet</h5>
+                                    <p class="text-muted">Start adding daily progress notes for this patient</p>
+                                    <button class="btn btn-success" onclick="addProgressNote()">
+                                        <i class="fas fa-plus"></i> Add First Note
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Vitals History -->
+                        <div class="col-lg-4">
+                            <h5>Vitals History</h5>
+                            {% if appointment.vitals %}
+                                {% for vital in appointment.vitals %}
+                                <div class="card mb-3">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex justify-content-between">
+                                            <small class="text-muted">{{ vital.date if vital.date else 'N/A' }}</small>
+                                            <small class="text-muted">{{ vital.date if vital.date else '' }}</small>
+                                        </div>
+                                        <div class="mt-2">
+                                            <strong>BP:</strong> {{ vital.bp_systolic or 'N/A' }}/{{ vital.bp_diastolic or 'N/A' }}<br>
+                                            <strong>Sugar:</strong> {{ vital.blood_sugar or 'N/A' }} mg/dL
+                                        </div>
+                                        {% if vital.notes %}
+                                        <p class="small mt-2 mb-0">{{ vital.notes }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="text-center py-3">
+                                    <i class="fas fa-heartbeat text-muted" style="font-size: 2rem;"></i>
+                                    <p class="mt-2 text-muted small">No vitals recorded yet</p>
+                                    <button class="btn btn-primary btn-sm" onclick="recordVitals()">
+                                        <i class="fas fa-plus"></i> Record Vitals
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="row mt-4">
+                        <div class="col-12 text-center">
+                            <a href="{{ url_for('doctor.dashboard') }}" class="btn btn-secondary me-2">
+                                <i class="fas fa-arrow-left"></i> Back to Dashboard
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Record Vitals Modal -->
+<div class="modal fade" id="vitalsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Record Patient Vitals</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="vitalsForm">
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label for="bpSystolic" class="form-label">BP Systolic *</label>
+                            <input type="number" class="form-control" id="bpSystolic" required>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label for="bpDiastolic" class="form-label">BP Diastolic *</label>
+                            <input type="number" class="form-control" id="bpDiastolic" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="bloodSugar" class="form-label">Blood Sugar (mg/dL)</label>
+                        <input type="number" class="form-control" id="bloodSugar">
+                    </div>
+                    <div class="mb-3">
+                        <label for="vitalsNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="vitalsNotes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveVitals()">Save Vitals</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Progress Modal -->
+<div class="modal fade" id="progressModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Progress Note</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="progressForm">
+                    <div class="mb-3">
+                        <label for="improvementScore" class="form-label">Improvement Score (1-10) *</label>
+                        <input type="range" class="form-range" id="improvementScore" min="1" max="10" value="5" required>
+                        <div class="text-center">
+                            <span id="scoreValue">5</span>/10
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="progressNotes" class="form-label">Progress Notes *</label>
+                        <textarea class="form-control" id="progressNotes" rows="4" required 
+                                  placeholder="Describe patient's condition, response to treatment, any observations..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="saveProgress()">Save Progress</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Complete Therapy Modal -->
+<div class="modal fade" id="completeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Complete Therapy</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="completeForm">
+                    <div class="mb-3">
+                        <label for="therapySummary" class="form-label">Therapy Summary *</label>
+                        <textarea class="form-control" id="therapySummary" rows="4" required
+                                  placeholder="Summarize the complete therapy, patient's progress, and outcomes..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="recommendations" class="form-label">Recommendations *</label>
+                        <textarea class="form-control" id="recommendations" rows="3" required
+                                  placeholder="Post-therapy recommendations, lifestyle changes, follow-up care..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nextSessionDate" class="form-label">Next Session Date (if applicable)</label>
+                        <input type="date" class="form-control" id="nextSessionDate">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="saveCompletion()">Complete Therapy</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const appointmentId = '{{ appointment.appointment_id }}';
+
+function recordVitals() {
+    const modal = new bootstrap.Modal(document.getElementById('vitalsModal'));
+    modal.show();
+}
+
+function addProgressNote() {
+    const modal = new bootstrap.Modal(document.getElementById('progressModal'));
+    modal.show();
+}
+
+function completeTherapy() {
+    const modal = new bootstrap.Modal(document.getElementById('completeModal'));
+    modal.show();
+}
+
+// Update improvement score display
+document.getElementById('improvementScore').addEventListener('input', function() {
+    document.getElementById('scoreValue').textContent = this.value;
+});
+
+async function saveVitals() {
+    const data = {
+        appointment_id: appointmentId,
+        bp_systolic: document.getElementById('bpSystolic').value,
+        bp_diastolic: document.getElementById('bpDiastolic').value,
+        blood_sugar: document.getElementById('bloodSugar').value,
+        notes: document.getElementById('vitalsNotes').value
+    };
+    
+    try {
+        const response = await fetch('/doctor/add-vitals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Vitals recorded successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('vitalsModal')).hide();
+            location.reload();
+        } else {
+            alert(result.message || 'Failed to record vitals');
+        }
+    } catch (error) {
+        console.error('Vitals error:', error);
+        alert('Failed to record vitals. Please try again.');
+    }
+}
+
+async function saveProgress() {
+    const data = {
+        appointment_id: appointmentId,
+        improvement_score: document.getElementById('improvementScore').value,
+        notes: document.getElementById('progressNotes').value
+    };
+    
+    try {
+        const response = await fetch('/doctor/add-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Progress note added successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('progressModal')).hide();
+            location.reload();
+        } else {
+            alert(result.message || 'Failed to add progress note');
+        }
+    } catch (error) {
+        console.error('Progress error:', error);
+        alert('Failed to add progress note. Please try again.');
+    }
+}
+
+async function saveCompletion() {
+    const data = {
+        appointment_id: appointmentId,
+        summary: document.getElementById('therapySummary').value,
+        recommendations: document.getElementById('recommendations').value,
+        next_session_date: document.getElementById('nextSessionDate').value
+    };
+    
+    try {
+        const response = await fetch('/doctor/complete-therapy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Therapy completed successfully! Patient will receive summary via email.');
+            bootstrap.Modal.getInstance(document.getElementById('completeModal')).hide();
+            window.location.href = '/doctor/dashboard';
+        } else {
+            alert(result.message || 'Failed to complete therapy');
+        }
+    } catch (error) {
+        console.error('Completion error:', error);
+        alert('Failed to complete therapy. Please try again.');
+    }
+}
+
+function viewSummary(appointmentId) {
+    // Implementation for viewing previous therapy summary
+    alert('Previous therapy summary viewing will be implemented');
+}
+</script>
+{% endblock %}
