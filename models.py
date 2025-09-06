@@ -1,6 +1,8 @@
 from datetime import datetime
 from utils import get_db_connection
 import bcrypt
+from pymongo import ASCENDING
+
 
 class User:
     def __init__(self):
@@ -274,7 +276,7 @@ class Appointment:
         if status:
             query['status'] = status
             
-        appointments = list(self.db.appointments.find(query).sort('appointment_date', 1))
+        appointments = list(self.db.appointments.find(query).sort([('appointment_date', ASCENDING)]))
         
         # Populate patient and doctor names and contact details
         for appointment in appointments:
