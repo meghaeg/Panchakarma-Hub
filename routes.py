@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash, current_app
 from datetime import datetime, timedelta
-from models import Patient, Centre, Doctor, Appointment, Feedback, Admin
+from models import Patient, Centre, Doctor, Appointment, DetoxAppointment, Feedback, Admin, ProgressTracking
 from utils import *
 from email_service import *
 import json
@@ -452,6 +452,153 @@ def submit_feedback():
     
     return render_template('patient/feedback.html', appointments=completed_appointments)
 
+# Detox Therapy Routes
+@patient_bp.route('/book-detox', methods=['GET', 'POST'])
+def book_detox():
+    if 'user_id' not in session or session.get('role') != 'patient':
+        return redirect(url_for('auth.login'))
+    
+    if request.method == 'GET':
+        # Show detox booking form
+        centre = Centre()
+        centres = centre.get_approved_centres()
+        return render_template('patient/book_detox.html', centres=centres)
+    
+    # Handle POST request
+    data = request.get_json()
+    centre_id = data.get('centre_id')
+    plan_type = data.get('plan_type')  # weight_loss_short, weight_loss_full, diabetes_short, diabetes_full
+    start_date = data.get('start_date')
+    notes = data.get('notes', '')
+    
+    # Validate date is within next 5 days
+    booking_date = datetime.strptime(start_date, '%Y-%m-%d')
+    today = datetime.now()
+    max_date = today + timedelta(days=5)
+    
+    if booking_date < today or booking_date > max_date:
+        return jsonify({'success': False, 'message': 'Please select a date within the next 5 days'})
+    
+    # Create detox appointment (therapy_time will be auto-assigned after centre approval)
+    detox_appointment_data = {
+        'detox_appointment_id': generate_detox_appointment_id(),
+        'patient_id': session.get('user_id'),
+        'centre_id': centre_id,
+        'plan_type': plan_type,
+        'start_date': start_date,
+        'notes': notes
+    }
+    
+    detox_appointment = DetoxAppointment()
+    result = detox_appointment.create(detox_appointment_data)
+    
+    if result:
+        return jsonify({
+            'success': True, 
+            'message': 'Detox therapy request submitted successfully. You will receive confirmation once approved by the centre.',
+            'detox_appointment_id': detox_appointment_data['detox_appointment_id']
+        })
+    
+    return jsonify({'success': False, 'message': 'Failed to submit detox therapy request'})
+
+@patient_bp.route('/detox-schedule/<detox_appointment_id>')
+def view_detox_schedule(detox_appointment_id):
+    if session.get('role') != 'patient':
+        return redirect(url_for('auth.login'))
+    
+    detox_appointment = DetoxAppointment()
+    appointment = detox_appointment.find_by_id(detox_appointment_id)
+    
+    if not appointment or appointment['patient_id'] != session.get('user_id'):
+        return redirect(url_for('patient.dashboard'))
+    
+    return render_template('patient/detox_schedule.html', appointment=appointment)
+
+@patient_bp.route('/detox-dashboard')
+def detox_dashboard():
+    if session.get('role') != 'patient':
+        return redirect(url_for('auth.login'))
+    
+    patient_id = session.get('user_id')
+    detox_appointment = DetoxAppointment()
+    appointments = detox_appointment.find_by_patient(patient_id)
+    
+    return render_template('patient/detox_dashboard.html', appointments=appointments)
+
+
+@patient_bp.route('/detox-progress/<detox_appointment_id>')
+def detox_progress(detox_appointment_id):
+    """Patient view of detox therapy progress"""
+    if session.get('role') != 'patient':
+        return redirect(url_for('auth.login'))
+    
+    patient_id = session.get('user_id')
+    detox_appointment = DetoxAppointment()
+    appointment = detox_appointment.find_by_id(detox_appointment_id)
+    
+    if not appointment or appointment['patient_id'] != patient_id:
+        return redirect(url_for('patient.detox_dashboard'))
+    
+    # Get progress data
+    progress_tracking = ProgressTracking()
+    progress_data = progress_tracking.get_daily_progress_summary(detox_appointment_id)
+    
+    return render_template('patient/detox_progress.html', 
+                         appointment=appointment, 
+                         progress_data=progress_data)
+
+
+@patient_bp.route('/api/detox-progress-data/<detox_appointment_id>')
+def api_detox_progress_data(detox_appointment_id):
+    """API endpoint for detox progress data (for charts)"""
+    if session.get('role') != 'patient':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        patient_id = session.get('user_id')
+        detox_appointment = DetoxAppointment()
+        appointment = detox_appointment.find_by_id(detox_appointment_id)
+        
+        if not appointment or appointment['patient_id'] != patient_id:
+            return jsonify({'success': False, 'message': 'Unauthorized'})
+        
+        progress_tracking = ProgressTracking()
+        progress_data = progress_tracking.get_daily_progress_summary(detox_appointment_id)
+        
+        # Format data for Chart.js
+        chart_data = {
+            'labels': [],  # Day numbers
+            'progress_scores': [],  # Progress scores
+            'vitals': {
+                'bp_systolic': [],
+                'bp_diastolic': [],
+                'blood_sugar': [],
+                'weight': [],
+                'heart_rate': []
+            }
+        }
+        
+        for day_num in sorted(progress_data.keys()):
+            day_data = progress_data[day_num]
+            chart_data['labels'].append(f"Day {day_num}")
+            
+            # Progress scores
+            chart_data['progress_scores'].append(day_data.get('progress_score', None))
+            
+            # Vitals
+            vitals = day_data.get('vitals', {})
+            chart_data['vitals']['bp_systolic'].append(vitals.get('bp_systolic', None))
+            chart_data['vitals']['bp_diastolic'].append(vitals.get('bp_diastolic', None))
+            chart_data['vitals']['blood_sugar'].append(vitals.get('blood_sugar', None))
+            chart_data['vitals']['weight'].append(vitals.get('weight', None))
+            chart_data['vitals']['heart_rate'].append(vitals.get('heart_rate', None))
+        
+        return jsonify({'success': True, 'data': chart_data})
+        
+    except Exception as e:
+        print(f"Error in api_detox_progress_data: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
 # Centre Routes
 @centre_bp.route('/dashboard')
 def dashboard():
@@ -583,6 +730,207 @@ def get_doctor_slots(doctor_id, date):
         'available_slots': available_slots,
         'doctor_name': doctor.find_by_id(doctor_id)['name'] if doctor.find_by_id(doctor_id) else 'Unknown'
     })
+
+# Centre Detox Approval Routes
+@centre_bp.route('/detox-dashboard')
+def detox_dashboard():
+    if session.get('role') != 'centre':
+        return redirect(url_for('auth.login'))
+    
+    centre_id = session.get('user_id')
+    detox_appointment = DetoxAppointment()
+    appointments = detox_appointment.find_by_centre(centre_id)
+    
+    # Get patient details for each appointment
+    patient = Patient()
+    for apt in appointments:
+        patient_data = patient.find_by_id(apt['patient_id'])
+        if patient_data:
+            apt['patient_name'] = patient_data['name']
+            apt['patient_email'] = patient_data['email']
+            apt['patient_phone'] = patient_data['phone']
+        else:
+            apt['patient_name'] = 'Unknown'
+            apt['patient_email'] = ''
+            apt['patient_phone'] = ''
+    
+    # Get doctors for this centre
+    doctor = Doctor()
+    doctors = doctor.find_by_centre(centre_id)
+    
+    return render_template('centre/detox_dashboard.html', appointments=appointments, doctors=doctors)
+
+@centre_bp.route('/approve-detox', methods=['POST'])
+def approve_detox():
+    try:
+        if session.get('role') != 'centre':
+            return jsonify({'success': False, 'message': 'Unauthorized'})
+        
+        data = request.get_json()
+        detox_appointment_id = data.get('detox_appointment_id')
+        action = data.get('action')  # 'approve' or 'reject'
+        doctor_id = data.get('doctor_id')
+        therapy_time = data.get('therapy_time')
+        
+        detox_appointment = DetoxAppointment()
+        appointment_data = detox_appointment.find_by_id(detox_appointment_id)
+        
+        if not appointment_data:
+            return jsonify({'success': False, 'message': 'Detox appointment not found'})
+        
+        if action == 'approve':
+            if not doctor_id or not therapy_time:
+                return jsonify({'success': False, 'message': 'Doctor and time slot must be selected'})
+            
+            # Check for conflicts
+            doctor = Doctor()
+            doctor_data = doctor.find_by_id(doctor_id)
+            
+            if not doctor_data:
+                return jsonify({'success': False, 'message': 'Selected doctor not found'})
+            
+            # Check if doctor is available at the selected time for the entire detox duration
+            start_date = datetime.strptime(appointment_data['start_date'], '%Y-%m-%d')
+            
+            # Get duration safely
+            duration = 7  # Default duration
+            if 'schedule' in appointment_data and 'plan_info' in appointment_data['schedule']:
+                duration = appointment_data['schedule']['plan_info'].get('duration', 7)
+            
+            # Check for conflicts with existing appointments
+            db = get_db_connection()
+            
+            # Calculate working days (excluding Sundays)
+            working_days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+            doctor_working_days = doctor_data.get('working_days', working_days)
+            doctor_working_days = [day.lower() for day in doctor_working_days if day.lower() != 'sunday']
+            
+            # Check each day, skipping Sundays
+            day_count = 0
+            current_date = start_date
+            
+            while day_count < duration:
+                day_of_week = current_date.strftime('%A').lower()
+                
+                # Skip Sundays - don't count them in the duration
+                if day_of_week == 'sunday':
+                    current_date += timedelta(days=1)
+                    continue
+                
+                # Check if doctor works on this day
+                if day_of_week not in doctor_working_days:
+                    return jsonify({'success': False, 'message': f'Doctor not available on {day_of_week} (Day {day_count + 1})'})
+                
+                # Check for existing appointments
+                try:
+                    existing_appointments = db.detox_appointments.find({
+                        'doctor_id': doctor_id,
+                        'start_date': current_date.strftime('%Y-%m-%d'),
+                        'therapy_time': therapy_time,
+                        'status': {'$in': ['confirmed', 'in_progress']}
+                    })
+                    
+                    # Convert to list to check count safely
+                    existing_list = list(existing_appointments)
+                    if len(existing_list) > 0:
+                        return jsonify({'success': False, 'message': f'Doctor already has an appointment at {therapy_time} on {current_date.strftime("%Y-%m-%d")} (Day {day_count + 1})'})
+                except Exception as e:
+                    print(f"Error checking existing appointments: {e}")
+                    # Continue without conflict check if there's an error
+                
+                # Move to next day and increment counter
+                current_date += timedelta(days=1)
+                day_count += 1
+            
+            # Assign doctor and time slot
+            result = detox_appointment.assign_doctor_and_time_slot(
+                detox_appointment_id, 
+                doctor_id, 
+                therapy_time
+            )
+            
+            if result:
+                # Send notification to patient
+                send_detox_approval_notification(appointment_data, doctor_data, therapy_time)
+                message = f'Detox therapy approved and assigned to Dr. {doctor_data["name"]} at {therapy_time}'
+            else:
+                message = 'Failed to assign doctor and time slot'
+        else:
+            detox_appointment.update_status(detox_appointment_id, 'rejected')
+            send_detox_rejection_notification(appointment_data)
+            message = 'Detox therapy rejected'
+        
+        return jsonify({'success': True, 'message': message})
+    
+    except Exception as e:
+        print(f"Error in approve_detox: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+@centre_bp.route('/detox-schedule/<detox_appointment_id>')
+def centre_view_detox_schedule(detox_appointment_id):
+    """Centre view detox schedule for a specific appointment"""
+    if session.get('role') != 'centre':
+        return redirect(url_for('auth.login'))
+    
+    detox_appointment = DetoxAppointment()
+    appointment = detox_appointment.find_by_id(detox_appointment_id)
+    
+    if not appointment or appointment['centre_id'] != session.get('user_id'):
+        return redirect(url_for('centre.detox_dashboard'))
+    
+    return render_template('centre/detox_schedule.html', appointment=appointment)
+
+def send_detox_approval_notification(appointment_data, doctor, time_slot):
+    """Send detox approval notification to patient"""
+    patient = Patient()
+    patient_info = patient.find_by_id(appointment_data['patient_id'])
+    
+    if patient_info:
+        subject = "Detox Therapy Approved - Panchakarma Portal"
+        body = f"""
+        Dear {patient_info['name']},
+        
+        Your detox therapy has been approved and a doctor has been assigned!
+        
+        Therapy Details:
+        - Plan: {appointment_data['schedule']['plan_info']['name']}
+        - Start Date: {appointment_data['start_date']}
+        - Duration: {appointment_data['schedule']['plan_info']['duration']} days
+        - Assigned Doctor: Dr. {doctor['name']}
+        - Daily Therapy Time: {time_slot}
+        
+        Please log in to your dashboard to view your detailed schedule.
+        
+        Best regards,
+        Panchakarma Portal Team
+        """
+        
+        send_email(patient_info['email'], subject, body)
+
+def send_detox_rejection_notification(appointment_data):
+    """Send detox rejection notification to patient"""
+    patient = Patient()
+    patient_info = patient.find_by_id(appointment_data['patient_id'])
+    
+    if patient_info:
+        subject = "Detox Therapy Request - Update Required"
+        body = f"""
+        Dear {patient_info['name']},
+        
+        We regret to inform you that your detox therapy request could not be approved at this time.
+        
+        Plan: {appointment_data['schedule']['plan_info']['name']}
+        Requested Start Date: {appointment_data['start_date']}
+        
+        Please try booking for a different date or contact the centre directly for more information.
+        
+        Best regards,
+        Panchakarma Portal Team
+        """
+        
+        send_email(patient_info['email'], subject, body)
 
 # Doctor Routes
 @doctor_bp.route('/dashboard')
@@ -992,3 +1340,207 @@ def get_progress_data(appointment_id):
         })
     
     return jsonify(progress_data)
+
+# Doctor Detox Therapy Routes
+@doctor_bp.route('/detox-dashboard')
+def detox_dashboard():
+    if session.get('role') != 'doctor':
+        return redirect(url_for('auth.login'))
+    
+    doctor_id = session.get('user_id')
+    detox_appointment = DetoxAppointment()
+    appointments = detox_appointment.find_by_doctor(doctor_id)
+    
+    # Filter out pending appointments (only show confirmed and beyond)
+    appointments = [apt for apt in appointments if apt.get('status') in ['confirmed', 'in_progress', 'completed']]
+    
+    return render_template('doctor/detox_dashboard.html', appointments=appointments)
+
+@doctor_bp.route('/detox-schedule/<detox_appointment_id>')
+def view_detox_schedule_doctor(detox_appointment_id):
+    if session.get('role') != 'doctor':
+        return redirect(url_for('auth.login'))
+    
+    detox_appointment = DetoxAppointment()
+    appointment = detox_appointment.find_by_id(detox_appointment_id)
+    
+    if not appointment or appointment['doctor_id'] != session.get('user_id'):
+        return redirect(url_for('doctor.detox_dashboard'))
+    
+    return render_template('doctor/detox_schedule.html', appointment=appointment)
+
+@doctor_bp.route('/update-detox-slot', methods=['POST'])
+def update_detox_slot():
+    try:
+        if session.get('role') != 'doctor':
+            return jsonify({'success': False, 'message': 'Unauthorized'})
+        
+        data = request.get_json()
+        detox_appointment_id = data.get('detox_appointment_id')
+        day = data.get('day')
+        slot = data.get('slot')
+        new_activity = data.get('new_activity')
+        
+        if not all([detox_appointment_id, day, slot, new_activity]):
+            return jsonify({'success': False, 'message': 'Missing required parameters'})
+        
+        detox_appointment = DetoxAppointment()
+        result = detox_appointment.update_schedule(
+            detox_appointment_id, day, slot, new_activity, session.get('name', 'Doctor')
+        )
+        
+        if result:
+            return jsonify({'success': True, 'message': 'Schedule updated successfully'})
+        
+        return jsonify({'success': False, 'message': 'Failed to update schedule'})
+    
+    except Exception as e:
+        print(f"Error in update_detox_slot: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+@doctor_bp.route('/add-detox-notes', methods=['POST'])
+def add_detox_notes():
+    try:
+        if session.get('role') != 'doctor':
+            return jsonify({'success': False, 'message': 'Unauthorized'})
+        
+        data = request.get_json()
+        detox_appointment_id = data.get('detox_appointment_id')
+        day = data.get('day')
+        slot = data.get('slot')
+        notes = data.get('notes')
+        
+        if not all([detox_appointment_id, day, slot]):
+            return jsonify({'success': False, 'message': 'Missing required parameters'})
+        
+        detox_appointment = DetoxAppointment()
+        result = detox_appointment.add_slot_notes(
+            detox_appointment_id, day, slot, notes, session.get('name', 'Doctor')
+        )
+        
+        if result:
+            return jsonify({'success': True, 'message': 'Notes added successfully'})
+        
+        return jsonify({'success': False, 'message': 'Failed to add notes'})
+    
+    except Exception as e:
+        print(f"Error in add_detox_notes: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+@doctor_bp.route('/approve-detox', methods=['POST'])
+def approve_detox():
+    if session.get('role') != 'doctor':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    data = request.get_json()
+    detox_appointment_id = data.get('detox_appointment_id')
+    action = data.get('action')  # 'approve' or 'reject'
+    
+    detox_appointment = DetoxAppointment()
+    if action == 'approve':
+        result = detox_appointment.update_status(detox_appointment_id, 'confirmed')
+        message = 'Detox therapy approved successfully'
+    else:
+        result = detox_appointment.update_status(detox_appointment_id, 'rejected')
+        message = 'Detox therapy rejected'
+    
+    if result.modified_count > 0:
+        return jsonify({'success': True, 'message': message})
+    
+    return jsonify({'success': False, 'message': 'Failed to update detox therapy status'})
+
+
+@doctor_bp.route('/quick-update-detox', methods=['POST'])
+def quick_update_detox():
+    """Quick update for detox therapy progress and vitals"""
+    if session.get('role') != 'doctor':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        data = request.get_json()
+        detox_appointment_id = data.get('detox_appointment_id')
+        update_type = data.get('update_type')  # 'vitals' or 'progress'
+        day_number = data.get('day_number')
+        notes = data.get('notes', '')
+        
+        if not all([detox_appointment_id, update_type, day_number]):
+            return jsonify({'success': False, 'message': 'Missing required parameters'})
+        
+        # Get detox appointment details
+        detox_appointment = DetoxAppointment()
+        appointment = detox_appointment.find_by_id(detox_appointment_id)
+        
+        if not appointment:
+            return jsonify({'success': False, 'message': 'Detox appointment not found'})
+        
+        # Get current date for the day
+        start_date = datetime.strptime(appointment['start_date'], '%Y-%m-%d')
+        current_date = start_date + timedelta(days=day_number - 1)
+        
+        progress_data = {
+            'detox_appointment_id': detox_appointment_id,
+            'patient_id': appointment['patient_id'],
+            'doctor_id': session.get('user_id'),
+            'day_number': day_number,
+            'date': current_date.strftime('%Y-%m-%d'),
+            'update_type': update_type,
+            'notes': notes
+        }
+        
+        if update_type == 'vitals':
+            vitals = {}
+            if data.get('bp_systolic'):
+                vitals['bp_systolic'] = data.get('bp_systolic')
+            if data.get('bp_diastolic'):
+                vitals['bp_diastolic'] = data.get('bp_diastolic')
+            if data.get('blood_sugar'):
+                vitals['blood_sugar'] = data.get('blood_sugar')
+            if data.get('weight'):
+                vitals['weight'] = data.get('weight')
+            if data.get('temperature'):
+                vitals['temperature'] = data.get('temperature')
+            if data.get('heart_rate'):
+                vitals['heart_rate'] = data.get('heart_rate')
+            
+            progress_data['vitals'] = vitals
+            
+        elif update_type == 'progress':
+            progress_score = data.get('progress_score')
+            if progress_score is not None:
+                progress_data['progress_score'] = int(progress_score)
+        
+        # Create progress tracking entry
+        progress_tracking = ProgressTracking()
+        result = progress_tracking.create(progress_data)
+        
+        if result.inserted_id:
+            return jsonify({'success': True, 'message': f'{update_type.title()} updated successfully'})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to save update'})
+            
+    except Exception as e:
+        print(f"Error in quick_update_detox: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@doctor_bp.route('/get-detox-progress/<detox_appointment_id>')
+def get_detox_progress(detox_appointment_id):
+    """Get progress data for a detox appointment"""
+    if session.get('role') != 'doctor':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        progress_tracking = ProgressTracking()
+        progress_data = progress_tracking.get_daily_progress_summary(detox_appointment_id)
+        
+        return jsonify({'success': True, 'data': progress_data})
+        
+    except Exception as e:
+        print(f"Error in get_detox_progress: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})

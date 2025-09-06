@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Detox Therapy Schedule - Centre View{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-calendar-alt text-primary"></i> Detox Therapy Schedule - Centre View</h2>
+                <a href="/centre/detox-dashboard" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Plan Information -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">{{ appointment.schedule.plan_info.name }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Patient:</strong><br>
+                            {{ appointment.patient_name }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Start Date:</strong><br>
+                            {{ appointment.start_date }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Duration:</strong><br>
+                            {{ appointment.schedule.plan_info.duration }} days
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Status:</strong><br>
+                            <span class="badge 
+                                {% if appointment.status == 'pending_approval' %}bg-warning
+                                {% elif appointment.status == 'confirmed' %}bg-success
+                                {% elif appointment.status == 'in_progress' %}bg-info
+                                {% elif appointment.status == 'completed' %}bg-secondary
+                                {% else %}bg-danger{% endif %}">
+                                {{ appointment.status.replace('_', ' ').title() }}
+                            </span>
+                        </div>
+                    </div>
+                    {% if appointment.assigned_doctor %}
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <strong>Assigned Doctor:</strong> {{ appointment.assigned_doctor }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Therapy Time:</strong> {{ appointment.therapy_time }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Safety Precautions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Safety Precautions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>General Precautions:</h6>
+                            <ul>
+                                {% for precaution in appointment.schedule.plan_info.precautions[:5] %}
+                                <li>{{ precaution }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Additional Notes:</h6>
+                            <ul>
+                                {% for precaution in appointment.schedule.plan_info.precautions[5:] %}
+                                <li>{{ precaution }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Daily Schedule -->
+    <div class="row">
+        <div class="col-12">
+            <h4 class="mb-3">Daily Schedule</h4>
+            <div class="accordion" id="scheduleAccordion">
+                {% for day_key, day_data in appointment.schedule.daily_schedules.items() %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading{{ loop.index }}">
+                        <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" 
+                                type="button" data-bs-toggle="collapse" 
+                                data-bs-target="#collapse{{ loop.index }}" 
+                                aria-expanded="{% if loop.first %}true{% else %}false{% endif %}" 
+                                aria-controls="collapse{{ loop.index }}">
+                            <strong>Day {{ day_data.day_number }} - {{ day_data.date }}</strong>
+                        </button>
+                    </h2>
+                    <div id="collapse{{ loop.index }}" 
+                         class="accordion-collapse collapse {% if loop.first %}show{% endif %}" 
+                         aria-labelledby="heading{{ loop.index }}" 
+                         data-bs-parent="#scheduleAccordion">
+                        <div class="accordion-body">
+                            <div class="row">
+                                {% for slot_key, slot_data in day_data.slots.items() %}
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-clock"></i> {{ slot_data.name }} ({{ slot_data.time }})
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="card-text">{{ slot_data.activity }}</p>
+                                            {% if slot_data.notes %}
+                                            <div class="alert alert-info py-2 mb-0">
+                                                <small><strong>Notes:</strong> {{ slot_data.notes }}</small>
+                                            </div>
+                                            {% endif %}
+                                            {% if slot_data.modified_by %}
+                                            <small class="text-muted">
+                                                Modified by: {{ slot_data.modified_by }}
+                                                {% if slot_data.modified_at %}
+                                                on {{ slot_data.modified_at[:10] }}
+                                                {% endif %}
+                                            </small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

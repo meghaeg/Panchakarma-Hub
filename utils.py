@@ -31,6 +31,8 @@ class InMemoryDB:
             'doctors': [],
             'admins': [],
             'appointments': [],
+            'detox_appointments': [],
+            'progress_tracking': [],
             'feedback': []
         }
         self._init_sample_data()
@@ -149,6 +151,14 @@ def generate_doctor_id():
 def generate_centre_id():
     """Generate unique centre ID"""
     return f"CEN{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+def generate_detox_appointment_id():
+    """Generate unique detox appointment ID"""
+    return f"DETOX{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+def generate_progress_id():
+    """Generate unique progress tracking ID"""
+    return f"PROG{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
 def validate_aadhar(aadhar):
     """Validate Aadhar number format"""

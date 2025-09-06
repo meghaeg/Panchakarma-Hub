@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Detox Schedule{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-edit text-primary"></i> Manage Detox Schedule</h2>
+                <a href="/doctor/detox-dashboard" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Plan Information -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">{{ appointment.schedule.plan_info.name }} - {{ appointment.patient_name }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Patient:</strong><br>
+                            {{ appointment.patient_name }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Start Date:</strong><br>
+                            {{ appointment.start_date }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Duration:</strong><br>
+                            {{ appointment.schedule.plan_info.duration }} days
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Status:</strong><br>
+                            <span class="badge 
+                                {% if appointment.status == 'pending_approval' %}bg-warning
+                                {% elif appointment.status == 'confirmed' %}bg-success
+                                {% elif appointment.status == 'in_progress' %}bg-info
+                                {% elif appointment.status == 'completed' %}bg-secondary
+                                {% else %}bg-danger{% endif %}">
+                                {{ appointment.status.replace('_', ' ').title() }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Update Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-plus-circle"></i> Quick Update</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="updateDay" class="form-label">Select Day:</label>
+                            <select class="form-select" id="updateDay">
+                                {% for day_num in range(1, appointment.schedule.plan_info.duration + 1) %}
+                                <option value="{{ day_num }}">Day {{ day_num }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="updateType" class="form-label">Update Type:</label>
+                            <select class="form-select" id="updateType">
+                                <option value="vitals">Vitals</option>
+                                <option value="progress">Progress</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button class="btn btn-success" onclick="openQuickUpdateModal()">
+                                <i class="fas fa-plus"></i> Add Update
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Safety Precautions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Safety Precautions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>General Precautions:</h6>
+                            <ul>
+                                {% for precaution in appointment.schedule.plan_info.precautions[:5] %}
+                                <li>{{ precaution }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Additional Notes:</h6>
+                            <ul>
+                                {% for precaution in appointment.schedule.plan_info.precautions[5:] %}
+                                <li>{{ precaution }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Daily Schedule -->
+    <div class="row">
+        <div class="col-12">
+            <h4 class="mb-3">Daily Schedule (Editable)</h4>
+            <div class="accordion" id="scheduleAccordion">
+                {% for day_key, day_data in appointment.schedule.daily_schedules.items() %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading{{ loop.index }}">
+                        <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" 
+                                type="button" data-bs-toggle="collapse" 
+                                data-bs-target="#collapse{{ loop.index }}" 
+                                aria-expanded="{% if loop.first %}true{% else %}false{% endif %}" 
+                                aria-controls="collapse{{ loop.index }}">
+                            <strong>Day {{ day_data.day_number }} - {{ day_data.date }}</strong>
+                        </button>
+                    </h2>
+                    <div id="collapse{{ loop.index }}" 
+                         class="accordion-collapse collapse {% if loop.first %}show{% endif %}" 
+                         aria-labelledby="heading{{ loop.index }}" 
+                         data-bs-parent="#scheduleAccordion">
+                        <div class="accordion-body">
+                            <div class="row">
+                                {% for slot_key, slot_data in day_data.slots.items() %}
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-clock"></i> {{ slot_data.name }} ({{ slot_data.time }})
+                                            </h6>
+                                            <button class="btn btn-sm btn-outline-primary" 
+                                                    onclick="editSlot('{{ day_data.day_number }}', '{{ slot_key }}', '{{ slot_data.activity|replace("'", "\\'") }}', '{{ slot_data.notes|replace("'", "\\'") }}')">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="card-text">{{ slot_data.activity }}</p>
+                                            {% if slot_data.notes %}
+                                            <div class="alert alert-info py-2 mb-2">
+                                                <small><strong>Notes:</strong> {{ slot_data.notes }}</small>
+                                            </div>
+                                            {% endif %}
+                                            {% if slot_data.modified_by %}
+                                            <small class="text-muted">
+                                                Modified by: {{ slot_data.modified_by }}
+                                                {% if slot_data.modified_at %}
+                                                on {{ slot_data.modified_at[:10] }}
+                                                {% endif %}
+                                            </small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Slot Modal -->
+<div class="modal fade" id="editSlotModal" tabindex="-1" aria-labelledby="editSlotModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editSlotModalLabel">Edit Schedule Slot</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editSlotForm">
+                    <input type="hidden" id="editDay" name="day">
+                    <input type="hidden" id="editSlot" name="slot">
+                    <input type="hidden" id="editDetoxAppointmentId" name="detox_appointment_id" value="{{ appointment.detox_appointment_id }}">
+                    
+                    <div class="mb-3">
+                        <label for="editActivity" class="form-label">Activity/Meal</label>
+                        <textarea class="form-control" id="editActivity" name="new_activity" rows="3" required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editNotes" class="form-label">Notes (Optional)</label>
+                        <textarea class="form-control" id="editNotes" name="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveSlotChanges()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function editSlot(day, slot, activity, notes) {
+    document.getElementById('editDay').value = day;
+    document.getElementById('editSlot').value = slot;
+    document.getElementById('editActivity').value = activity;
+    document.getElementById('editNotes').value = notes;
+    
+    var modal = new bootstrap.Modal(document.getElementById('editSlotModal'));
+    modal.show();
+}
+
+function saveSlotChanges() {
+    const formData = new FormData(document.getElementById('editSlotForm'));
+    const data = Object.fromEntries(formData);
+    
+    // Update activity
+    fetch('/doctor/update-detox-slot', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            detox_appointment_id: data.detox_appointment_id,
+            day: parseInt(data.day),
+            slot: data.slot,
+            new_activity: data.new_activity
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Add notes if provided
+            if (document.getElementById('editNotes').value.trim()) {
+                return fetch('/doctor/add-detox-notes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        detox_appointment_id: formData.get('detox_appointment_id'),
+                        day: parseInt(formData.get('day')),
+                        slot: formData.get('slot'),
+                        notes: document.getElementById('editNotes').value
+                    })
+                });
+            }
+            return { success: true };
+        }
+        throw new Error(data.message);
+    })
+    .then(response => response ? response.json() : { success: true })
+    .then(data => {
+        if (data.success) {
+            alert('Schedule updated successfully!');
+            location.reload();
+        } else {
+            throw new Error(data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error: ' + error.message);
+    });
+}
+
+function openQuickUpdateModal() {
+    const day = document.getElementById('updateDay').value;
+    const updateType = document.getElementById('updateType').value;
+    
+    // Set the day and type in the modal
+    document.getElementById('quickUpdateDay').value = day;
+    document.getElementById('quickUpdateType').value = updateType;
+    
+    // Show/hide relevant fields based on type
+    const vitalsSection = document.getElementById('vitalsSection');
+    const progressSection = document.getElementById('progressSection');
+    
+    if (updateType === 'vitals') {
+        vitalsSection.style.display = 'block';
+        progressSection.style.display = 'none';
+    } else {
+        vitalsSection.style.display = 'none';
+        progressSection.style.display = 'block';
+    }
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('quickUpdateModal'));
+    modal.show();
+}
+
+function saveQuickUpdate() {
+    const formData = new FormData(document.getElementById('quickUpdateForm'));
+    const data = Object.fromEntries(formData);
+    
+    // Prepare the request data
+    const requestData = {
+        detox_appointment_id: '{{ appointment.detox_appointment_id }}',
+        update_type: data.update_type,
+        day_number: parseInt(data.day_number),
+        notes: data.notes
+    };
+    
+    // Add type-specific data
+    if (data.update_type === 'vitals') {
+        if (data.bp_systolic) requestData.bp_systolic = data.bp_systolic;
+        if (data.bp_diastolic) requestData.bp_diastolic = data.bp_diastolic;
+        if (data.blood_sugar) requestData.blood_sugar = data.blood_sugar;
+        if (data.weight) requestData.weight = data.weight;
+        if (data.temperature) requestData.temperature = data.temperature;
+        if (data.heart_rate) requestData.heart_rate = data.heart_rate;
+    } else if (data.update_type === 'progress') {
+        if (data.progress_score) requestData.progress_score = parseInt(data.progress_score);
+    }
+    
+    fetch('/doctor/quick-update-detox', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Update saved successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('quickUpdateModal')).hide();
+            document.getElementById('quickUpdateForm').reset();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error: ' + error.message);
+    });
+}
+</script>
+
+<!-- Quick Update Modal -->
+<div class="modal fade" id="quickUpdateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Quick Update</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="quickUpdateForm">
+                    <input type="hidden" id="quickUpdateDay" name="day_number">
+                    <input type="hidden" id="quickUpdateType" name="update_type">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Update Type</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="update_type_radio" id="vitalsRadio" value="vitals" checked>
+                            <label class="btn btn-outline-primary" for="vitalsRadio">Vitals</label>
+                            
+                            <input type="radio" class="btn-check" name="update_type_radio" id="progressRadio" value="progress">
+                            <label class="btn btn-outline-success" for="progressRadio">Progress</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Vitals Section -->
+                    <div id="vitalsSection">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="bp_systolic" class="form-label">BP Systolic</label>
+                                    <input type="number" class="form-control" id="bp_systolic" name="bp_systolic" placeholder="120">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="bp_diastolic" class="form-label">BP Diastolic</label>
+                                    <input type="number" class="form-control" id="bp_diastolic" name="bp_diastolic" placeholder="80">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="blood_sugar" class="form-label">Blood Sugar (mg/dL)</label>
+                                    <input type="number" class="form-control" id="blood_sugar" name="blood_sugar" placeholder="100">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="weight" class="form-label">Weight (kg)</label>
+                                    <input type="number" class="form-control" id="weight" name="weight" placeholder="70" step="0.1">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="temperature" class="form-label">Temperature (°F)</label>
+                                    <input type="number" class="form-control" id="temperature" name="temperature" placeholder="98.6" step="0.1">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="heart_rate" class="form-label">Heart Rate (bpm)</label>
+                                    <input type="number" class="form-control" id="heart_rate" name="heart_rate" placeholder="72">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Section -->
+                    <div id="progressSection" style="display: none;">
+                        <div class="mb-3">
+                            <label for="progress_score" class="form-label">Improvement Score (1-10)</label>
+                            <input type="range" class="form-range" id="progress_score" name="progress_score" min="1" max="10" value="5">
+                            <div class="d-flex justify-content-between">
+                                <small>1 (Poor)</small>
+                                <small id="scoreValue">5/10</small>
+                                <small>10 (Excellent)</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Add any additional notes..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="saveQuickUpdate()">Save Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Update score display
+document.getElementById('progress_score').addEventListener('input', function() {
+    document.getElementById('scoreValue').textContent = this.value + '/10';
+});
+
+// Handle radio button changes
+document.getElementById('vitalsRadio').addEventListener('change', function() {
+    if (this.checked) {
+        document.getElementById('vitalsSection').style.display = 'block';
+        document.getElementById('progressSection').style.display = 'none';
+        document.getElementById('quickUpdateType').value = 'vitals';
+    }
+});
+
+document.getElementById('progressRadio').addEventListener('change', function() {
+    if (this.checked) {
+        document.getElementById('vitalsSection').style.display = 'none';
+        document.getElementById('progressSection').style.display = 'block';
+        document.getElementById('quickUpdateType').value = 'progress';
+    }
+});
+</script>
+
+{% endblock %}

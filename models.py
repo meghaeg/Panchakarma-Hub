@@ -1,5 +1,5 @@
 from datetime import datetime
-from utils import get_db_connection
+from utils import get_db_connection, generate_progress_id
 import bcrypt
 from pymongo import ASCENDING
 
@@ -208,8 +208,8 @@ class Appointment:
             'time_slot': assigned_slot,
             'status': 'pending_approval',  # Centre needs to confirm
             'notes': data.get('notes', ''),
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow(),
+            'created_at': datetime.now(),
+            'updated_at': datetime.now(),
             'assigned_doctor': assigned_doctor['name']
         }
         
@@ -255,7 +255,7 @@ class Appointment:
         """
         update_data = {
             'status': status,
-            'updated_at': datetime.utcnow()
+            'updated_at': datetime.now()
         }
         update_data.update(updates)
         
@@ -443,6 +443,199 @@ class Feedback:
         """Find feedback by target (doctor/centre)"""
         return list(self.db.feedback.find({'target_id': target_id, 'feedback_type': feedback_type}))
 
+class DetoxAppointment:
+    def __init__(self):
+        self.db = get_db_connection()
+    
+    def create(self, data):
+        """Create new detox therapy appointment - doctor assigned after centre approval"""
+        from detox_plans import DetoxPlans
+        
+        # Check if centre is approved
+        centre = self.db.centres.find_one(
+            {'centre_id': data['centre_id'], 'status': 'approved'}
+        )
+        if not centre:
+            raise ValueError('Centre not approved or does not exist')
+        
+        # Generate detox schedule based on plan type (without doctor assignment yet)
+        plan_type = data.get('plan_type', 'weight_loss_short')
+        start_date = data.get('start_date', datetime.now().strftime('%Y-%m-%d'))
+        therapy_time = data.get('therapy_time', '10:00')
+        
+        schedule = DetoxPlans.generate_schedule(plan_type, start_date, therapy_time)
+        
+        # Create detox appointment without doctor assignment
+        detox_appointment_data = {
+            'detox_appointment_id': data['detox_appointment_id'],
+            'patient_id': data['patient_id'],
+            'centre_id': data['centre_id'],
+            'doctor_id': None,  # Will be assigned after centre approval
+            'plan_type': plan_type,
+            'start_date': start_date,
+            'therapy_time': therapy_time,
+            'status': 'pending_approval',
+            'schedule': schedule,
+            'notes': data.get('notes', ''),
+            'created_at': datetime.now(),
+            'updated_at': datetime.now(),
+            'assigned_doctor': None  # Will be set after doctor assignment
+        }
+        
+        result = self.db.detox_appointments.insert_one(detox_appointment_data)
+        return result
+    
+    def find_by_id(self, detox_appointment_id):
+        """Find detox appointment by ID"""
+        return self.db.detox_appointments.find_one({'detox_appointment_id': detox_appointment_id})
+    
+    def find_by_patient(self, patient_id, status=None):
+        """Find detox appointments for a patient"""
+        query = {'patient_id': patient_id}
+        if status:
+            query['status'] = status
+            
+        appointments = list(self.db.detox_appointments
+                          .find(query)
+                          .sort('start_date', 1))
+        
+        # Populate doctor and centre names
+        for appointment in appointments:
+            if appointment.get('doctor_id'):
+                doctor = self.db.doctors.find_one({'doctor_id': appointment['doctor_id']})
+                appointment['doctor_name'] = doctor['name'] if doctor else 'Unknown Doctor'
+            
+            if appointment.get('centre_id'):
+                centre = self.db.centres.find_one({'centre_id': appointment['centre_id']})
+                appointment['centre_name'] = centre['name'] if centre else 'Unknown Centre'
+        
+        return appointments
+    
+    def find_by_centre(self, centre_id, status=None):
+        """Find detox appointments for a centre"""
+        query = {'centre_id': centre_id}
+        if status:
+            query['status'] = status
+            
+        appointments = list(self.db.detox_appointments
+                          .find(query)
+                          .sort('start_date', 1))
+        
+        return appointments
+    
+    def find_by_doctor(self, doctor_id):
+        """Find detox appointments by doctor"""
+        appointments = list(self.db.detox_appointments.find({'doctor_id': doctor_id}))
+        
+        # Populate patient names
+        for appointment in appointments:
+            if appointment.get('patient_id'):
+                patient = self.db.patients.find_one({'patient_id': appointment['patient_id']})
+                appointment['patient_name'] = patient['name'] if patient else 'Unknown Patient'
+        
+        return appointments
+    
+    def update_status(self, detox_appointment_id, status, **updates):
+        """Update detox appointment status"""
+        update_data = {
+            'status': status,
+            'updated_at': datetime.now()
+        }
+        update_data.update(updates)
+        
+        return self.db.detox_appointments.update_one(
+            {'detox_appointment_id': detox_appointment_id},
+            {'$set': update_data}
+        )
+    
+    def update_schedule(self, detox_appointment_id, day, slot, new_activity, modified_by):
+        """Update a specific slot in the detox schedule"""
+        from detox_plans import DetoxPlans
+        
+        appointment = self.find_by_id(detox_appointment_id)
+        if not appointment:
+            return False
+        
+        schedule = appointment.get('schedule', {})
+        
+        if 'daily_schedules' not in schedule:
+            return False
+        
+        day_key = f'day_{day}'
+        if day_key not in schedule['daily_schedules']:
+            return False
+        
+        if slot not in schedule['daily_schedules'][day_key]['slots']:
+            return False
+        
+        updated_schedule = DetoxPlans.update_slot_activity(
+            schedule, day, slot, new_activity, modified_by
+        )
+        
+        result = self.db.detox_appointments.update_one(
+            {'detox_appointment_id': detox_appointment_id},
+            {'$set': {'schedule': updated_schedule, 'updated_at': datetime.now()}}
+        )
+        
+        return result.modified_count > 0
+    
+    def add_slot_notes(self, detox_appointment_id, day, slot, notes, modified_by):
+        """Add notes to a specific slot in the detox schedule"""
+        from detox_plans import DetoxPlans
+        
+        appointment = self.find_by_id(detox_appointment_id)
+        if not appointment:
+            return False
+        
+        schedule = appointment.get('schedule', {})
+        
+        if 'daily_schedules' not in schedule:
+            return False
+        
+        day_key = f'day_{day}'
+        if day_key not in schedule['daily_schedules']:
+            return False
+        
+        if slot not in schedule['daily_schedules'][day_key]['slots']:
+            return False
+        
+        updated_schedule = DetoxPlans.add_slot_notes(
+            schedule, day, slot, notes, modified_by
+        )
+        
+        result = self.db.detox_appointments.update_one(
+            {'detox_appointment_id': detox_appointment_id},
+            {'$set': {'schedule': updated_schedule, 'updated_at': datetime.now()}}
+        )
+        
+        return result.modified_count > 0
+    
+    def assign_doctor_and_time_slot(self, detox_appointment_id, doctor_id, therapy_time):
+        """Assign doctor and time slot after centre approval"""
+        # Get the appointment
+        appointment = self.find_by_id(detox_appointment_id)
+        if not appointment:
+            return False
+        
+        # Get doctor details
+        doctor = self.db.doctors.find_one({'doctor_id': doctor_id})
+        if not doctor:
+            return False
+        
+        # Update the appointment with doctor assignment and time slot
+        result = self.db.detox_appointments.update_one(
+            {'detox_appointment_id': detox_appointment_id},
+            {'$set': {
+                'doctor_id': doctor_id,
+                'assigned_doctor': doctor['name'],
+                'therapy_time': therapy_time,
+                'status': 'confirmed',
+                'updated_at': datetime.now()
+            }}
+        )
+        
+        return result.modified_count > 0
+
 class Admin(User):
     def find_by_email(self, email):
         """Find admin by email"""
@@ -462,3 +655,84 @@ class Admin(User):
         if not existing:
             return self.db.admin.insert_one(admin_data)
         return existing
+
+
+class ProgressTracking:
+    """Model for tracking detox therapy progress, vitals, and summaries"""
+    
+    def __init__(self):
+        self.db = get_db_connection()
+    
+    def create(self, data):
+        """Create a new progress tracking entry"""
+        progress_data = {
+            'progress_id': generate_progress_id(),
+            'detox_appointment_id': data['detox_appointment_id'],
+            'patient_id': data['patient_id'],
+            'doctor_id': data['doctor_id'],
+            'day_number': data['day_number'],
+            'date': data['date'],
+            'update_type': data['update_type'],  # 'vitals', 'progress', 'summary'
+            'vitals': data.get('vitals', {}),  # BP, blood sugar, weight, etc.
+            'progress_score': data.get('progress_score', None),  # 1-10 scale
+            'notes': data.get('notes', ''),
+            'created_at': datetime.now(),
+            'updated_at': datetime.now()
+        }
+        return self.db.progress_tracking.insert_one(progress_data)
+    
+    def find_by_detox_appointment(self, detox_appointment_id):
+        """Find all progress entries for a detox appointment"""
+        return list(self.db.progress_tracking.find(
+            {'detox_appointment_id': detox_appointment_id}
+        ).sort('day_number', 1))
+    
+    def find_by_patient(self, patient_id):
+        """Find all progress entries for a patient"""
+        return list(self.db.progress_tracking.find(
+            {'patient_id': patient_id}
+        ).sort('created_at', -1))
+    
+    def find_by_doctor(self, doctor_id):
+        """Find all progress entries created by a doctor"""
+        return list(self.db.progress_tracking.find(
+            {'doctor_id': doctor_id}
+        ).sort('created_at', -1))
+    
+    def update(self, progress_id, data):
+        """Update a progress tracking entry"""
+        update_data = {
+            'updated_at': datetime.now()
+        }
+        update_data.update(data)
+        
+        return self.db.progress_tracking.update_one(
+            {'progress_id': progress_id},
+            {'$set': update_data}
+        )
+    
+    def get_daily_progress_summary(self, detox_appointment_id):
+        """Get daily progress summary for visualization"""
+        progress_entries = self.find_by_detox_appointment(detox_appointment_id)
+        
+        # Group by day and type
+        daily_data = {}
+        for entry in progress_entries:
+            day = entry['day_number']
+            if day not in daily_data:
+                daily_data[day] = {
+                    'date': entry['date'],
+                    'vitals': {},
+                    'progress_score': None,
+                    'notes': []
+                }
+            
+            if entry['update_type'] == 'vitals':
+                daily_data[day]['vitals'].update(entry['vitals'])
+            elif entry['update_type'] == 'progress':
+                daily_data[day]['progress_score'] = entry['progress_score']
+            
+            if entry['notes']:
+                daily_data[day]['notes'].append(entry['notes'])
+        
+        return daily_data

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Book Detox Therapy{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Book Detox Therapy</h4>
+                </div>
+                <div class="card-body">
+                    <form id="detoxBookingForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="centre_id" class="form-label">Select Centre *</label>
+                                    <select class="form-select" id="centre_id" name="centre_id" required>
+                                        <option value="">Choose a centre...</option>
+                                        {% for centre in centres %}
+                                        <option value="{{ centre.centre_id }}">{{ centre.name }} - {{ centre.city }}, {{ centre.state }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="plan_type" class="form-label">Detox Plan *</label>
+                                    <select class="form-select" id="plan_type" name="plan_type" required>
+                                        <option value="">Select plan...</option>
+                                        <option value="weight_loss_short">Weight Loss - Short (7 Days)</option>
+                                        <option value="weight_loss_full">Weight Loss - Full (14 Days)</option>
+                                        <option value="diabetes_short">Diabetes - Short (7 Days)</option>
+                                        <option value="diabetes_full">Diabetes - Full (14 Days)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group mb-3">
+                                    <label for="start_date" class="form-label">Start Date *</label>
+                                    <input type="date" class="form-control" id="start_date" name="start_date" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="notes" class="form-label">Additional Notes</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Any specific requirements or health concerns..."></textarea>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-info-circle"></i> Important Information:</h6>
+                            <ul class="mb-0">
+                                <li>Detox therapy requires centre approval before confirmation</li>
+                                <li>You will receive a detailed day-wise schedule once approved</li>
+                                <li>Please follow all safety precautions during the therapy</li>
+                                <li>Contact your assigned doctor for any concerns</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-calendar-plus"></i> Submit Detox Therapy Request
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('detoxBookingForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData);
+    
+    // Remove therapy_time as it will be auto-assigned
+    delete data.therapy_time;
+    
+    fetch('/patient/book-detox', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            window.location.href = '/patient/detox-dashboard';
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+    });
+});
+
+// Set minimum date to today
+document.getElementById('start_date').min = new Date().toISOString().split('T')[0];
+</script>
+{% endblock %}

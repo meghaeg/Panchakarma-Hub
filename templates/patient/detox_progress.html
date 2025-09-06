@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Detox Progress{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-chart-line text-primary"></i> Detox Progress</h2>
+                <a href="/patient/detox-dashboard" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Therapy Information -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">{{ appointment.schedule.plan_info.name }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Start Date:</strong><br>
+                            {{ appointment.start_date }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Duration:</strong><br>
+                            {{ appointment.schedule.plan_info.duration }} days
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Status:</strong><br>
+                            <span class="badge 
+                                {% if appointment.status == 'pending_approval' %}bg-warning
+                                {% elif appointment.status == 'confirmed' %}bg-success
+                                {% elif appointment.status == 'in_progress' %}bg-info
+                                {% elif appointment.status == 'completed' %}bg-secondary
+                                {% else %}bg-danger{% endif %}">
+                                {{ appointment.status.replace('_', ' ').title() }}
+                            </span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Doctor:</strong><br>
+                            {{ appointment.assigned_doctor or 'Not Assigned' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Progress Charts -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-line"></i> Daily Progress Tracking</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <canvas id="progressChart" width="400" height="200"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <canvas id="vitalsChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Daily Progress Summary -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-calendar-day"></i> Daily Progress Summary</h5>
+                </div>
+                <div class="card-body">
+                    {% if progress_data %}
+                        <div class="row">
+                            {% for day_num, day_data in progress_data.items() %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card border-left-primary">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Day {{ day_num }} - {{ day_data.date }}</h6>
+                                        
+                                        {% if day_data.progress_score %}
+                                        <div class="mb-2">
+                                            <strong>Progress Score:</strong>
+                                            <span class="badge bg-success">{{ day_data.progress_score }}/10</span>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if day_data.vitals %}
+                                        <div class="mb-2">
+                                            <strong>Vitals:</strong>
+                                            <ul class="list-unstyled mb-0">
+                                                {% for vital, value in day_data.vitals.items() %}
+                                                <li><small>{{ vital.replace('_', ' ').title() }}: {{ value }}</small></li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if day_data.notes %}
+                                        <div class="mb-2">
+                                            <strong>Notes:</strong>
+                                            <ul class="list-unstyled mb-0">
+                                                {% for note in day_data.notes %}
+                                                <li><small>{{ note }}</small></li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if not day_data.progress_score and not day_data.vitals and not day_data.notes %}
+                                        <small class="text-muted">No updates recorded for this day</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Progress Data Available</h5>
+                            <p class="text-muted">Your doctor will update your progress and vitals as the therapy progresses.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Load progress data and create charts
+document.addEventListener('DOMContentLoaded', function() {
+    const detoxAppointmentId = '{{ appointment.detox_appointment_id }}';
+    
+    fetch(`/patient/api/detox-progress-data/${detoxAppointmentId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                createProgressChart(data.data);
+                createVitalsChart(data.data);
+            } else {
+                console.error('Failed to load progress data:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading progress data:', error);
+        });
+});
+
+function createProgressChart(data) {
+    const ctx = document.getElementById('progressChart').getContext('2d');
+    
+    // Filter out null values for progress scores
+    const progressData = data.progress_scores.map(score => score !== null ? score : null);
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: 'Progress Score',
+                data: progressData,
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.4,
+                fill: true,
+                spanGaps: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 10,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Daily Progress Score (1-10)'
+                },
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+function createVitalsChart(data) {
+    const ctx = document.getElementById('vitalsChart').getContext('2d');
+    
+    // Filter out null values and prepare vitals data
+    const vitalsData = {
+        'Blood Pressure (Systolic)': data.vitals.bp_systolic.filter(val => val !== null),
+        'Blood Sugar': data.vitals.blood_sugar.filter(val => val !== null),
+        'Weight': data.vitals.weight.filter(val => val !== null),
+        'Heart Rate': data.vitals.heart_rate.filter(val => val !== null)
+    };
+    
+    const colors = [
+        'rgb(255, 99, 132)',
+        'rgb(54, 162, 235)',
+        'rgb(255, 205, 86)',
+        'rgb(75, 192, 192)'
+    ];
+    
+    const datasets = [];
+    let colorIndex = 0;
+    
+    for (const [label, values] of Object.entries(vitalsData)) {
+        if (values.length > 0) {
+            datasets.push({
+                label: label,
+                data: values,
+                borderColor: colors[colorIndex % colors.length],
+                backgroundColor: colors[colorIndex % colors.length] + '20',
+                tension: 0.4,
+                fill: false
+            });
+            colorIndex++;
+        }
+    }
+    
+    if (datasets.length > 0) {
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels.slice(0, datasets[0].data.length),
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Daily Vitals Tracking'
+                    }
+                }
+            }
+        });
+    } else {
+        // Show message if no vitals data
+        ctx.font = '16px Arial';
+        ctx.fillStyle = '#666';
+        ctx.textAlign = 'center';
+        ctx.fillText('No vitals data available', ctx.canvas.width / 2, ctx.canvas.height / 2);
+    }
+}
+</script>
+{% endblock %}

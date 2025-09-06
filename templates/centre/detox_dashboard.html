@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Detox Therapy Management{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-heartbeat text-primary"></i> Detox Therapy Management</h2>
+                <a href="/centre/dashboard" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    {% if appointments %}
+    <div class="row">
+        {% for appointment in appointments %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">{{ appointment.schedule.plan_info.name }}</h6>
+                    <span class="badge 
+                        {% if appointment.status == 'pending_approval' %}bg-warning
+                        {% elif appointment.status == 'confirmed' %}bg-success
+                        {% elif appointment.status == 'in_progress' %}bg-info
+                        {% elif appointment.status == 'completed' %}bg-secondary
+                        {% else %}bg-danger{% endif %}">
+                        {{ appointment.status.replace('_', ' ').title() }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <strong>Patient:</strong> {{ appointment.patient_name }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Start Date:</strong> {{ appointment.start_date }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Duration:</strong> {{ appointment.schedule.plan_info.duration }} days
+                    </div>
+                    {% if appointment.assigned_doctor %}
+                    <div class="mb-2">
+                        <strong>Assigned Doctor:</strong> {{ appointment.assigned_doctor }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Therapy Time:</strong> {{ appointment.therapy_time }}
+                    </div>
+                    {% endif %}
+                    {% if appointment.notes %}
+                    <div class="mb-3">
+                        <strong>Notes:</strong> {{ appointment.notes }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer">
+                    <div class="d-grid gap-2">
+                        {% if appointment.status == 'pending_approval' %}
+                        <!-- Doctor Assignment Section -->
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Assign Doctor:</strong></label>
+                            <select class="form-select" id="doctor_{{ appointment.detox_appointment_id }}">
+                                <option value="">Select a doctor...</option>
+                                {% for doctor in doctors %}
+                                <option value="{{ doctor.doctor_id }}" 
+                                        data-available-sessions="{{ doctor.available_sessions|join(',') }}">
+                                    {{ doctor.name }} ({{ doctor.specialization }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Select Time Slot:</strong></label>
+                            <select class="form-select" id="time_slot_{{ appointment.detox_appointment_id }}">
+                                <option value="">Select time slot...</option>
+                            </select>
+                        </div>
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-success btn-sm" 
+                                    onclick="approveDetoxWithDoctor('{{ appointment.detox_appointment_id }}')">
+                                <i class="fas fa-check"></i> Approve & Assign
+                            </button>
+                            <button class="btn btn-danger btn-sm" 
+                                    onclick="rejectDetox('{{ appointment.detox_appointment_id }}')">
+                                <i class="fas fa-times"></i> Reject
+                            </button>
+                        </div>
+                        {% elif appointment.status in ['confirmed', 'in_progress', 'completed'] %}
+                        <a href="/centre/detox-schedule/{{ appointment.detox_appointment_id }}" 
+                           class="btn btn-primary">
+                            <i class="fas fa-calendar-alt"></i> View Schedule
+                        </a>
+                        {% else %}
+                        <div class="text-center text-muted">
+                            <small>No actions available</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">No Detox Therapy Requests</h4>
+                <p class="text-muted">No detox therapy requests have been submitted to your centre yet.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Doctor selection handler
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners to all doctor select elements
+    document.querySelectorAll('[id^="doctor_"]').forEach(function(select) {
+        select.addEventListener('change', function() {
+            const detoxAppointmentId = this.id.replace('doctor_', '');
+            const selectedOption = this.options[this.selectedIndex];
+            const timeSlotSelect = document.getElementById('time_slot_' + detoxAppointmentId);
+            
+            // Clear existing options
+            timeSlotSelect.innerHTML = '<option value="">Select time slot...</option>';
+            
+            if (selectedOption.value) {
+                const availableSessions = selectedOption.getAttribute('data-available-sessions').split(',');
+                availableSessions.forEach(function(session) {
+                    if (session.trim()) {
+                        const option = document.createElement('option');
+                        option.value = session.trim();
+                        option.textContent = session.trim();
+                        timeSlotSelect.appendChild(option);
+                    }
+                });
+            }
+        });
+    });
+});
+
+function approveDetoxWithDoctor(detoxAppointmentId) {
+    const doctorSelect = document.getElementById('doctor_' + detoxAppointmentId);
+    const timeSlotSelect = document.getElementById('time_slot_' + detoxAppointmentId);
+    
+    if (!doctorSelect.value) {
+        alert('Please select a doctor first.');
+        return;
+    }
+    
+    if (!timeSlotSelect.value) {
+        alert('Please select a time slot first.');
+        return;
+    }
+    
+    if (confirm('Are you sure you want to approve this detox therapy request and assign the selected doctor?')) {
+        fetch('/centre/approve-detox', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                detox_appointment_id: detoxAppointmentId,
+                action: 'approve',
+                doctor_id: doctorSelect.value,
+                therapy_time: timeSlotSelect.value
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Detox therapy approved and doctor assigned successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while approving the request.');
+        });
+    }
+}
+
+function rejectDetox(detoxAppointmentId) {
+    if (confirm('Are you sure you want to reject this detox therapy request?')) {
+        fetch('/centre/approve-detox', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                detox_appointment_id: detoxAppointmentId,
+                action: 'reject'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Detox therapy rejected.');
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while rejecting the request.');
+        });
+    }
+}
+</script>
+{% endblock %}
