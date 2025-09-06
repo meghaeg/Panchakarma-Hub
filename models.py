@@ -1,5 +1,5 @@
 from datetime import datetime
-from utils import get_db_connection, generate_progress_id
+from utils import get_db_connection, generate_progress_id, generate_notification_id
 import bcrypt
 from pymongo import ASCENDING
 
@@ -736,3 +736,107 @@ class ProgressTracking:
                 daily_data[day]['notes'].append(entry['notes'])
         
         return daily_data
+
+
+class Notification:
+    """Model for managing dashboard notifications"""
+    
+    def __init__(self):
+        self.db = get_db_connection()
+    
+    def create(self, data):
+        """Create a new notification"""
+        notification_data = {
+            'notification_id': generate_notification_id(),
+            'user_id': data['user_id'],
+            'user_type': data['user_type'],  # 'patient', 'doctor', 'centre'
+            'title': data['title'],
+            'message': data['message'],
+            'type': data['type'],  # 'appointment', 'detox', 'precaution', 'general'
+            'priority': data.get('priority', 'medium'),  # 'low', 'medium', 'high', 'urgent'
+            'related_id': data.get('related_id'),  # appointment_id, detox_appointment_id, etc.
+            'is_read': False,
+            'created_at': datetime.now(),
+            'expires_at': data.get('expires_at')  # Optional expiration date
+        }
+        return self.db.notifications.insert_one(notification_data)
+    
+    def find_by_user(self, user_id, user_type, limit=50):
+        """Find notifications for a specific user"""
+        query = {
+            'user_id': user_id,
+            'user_type': user_type,
+            'is_read': False
+        }
+        
+        # Add expiration filter if expires_at exists
+        query['$or'] = [
+            {'expires_at': {'$exists': False}},
+            {'expires_at': None},
+            {'expires_at': {'$gt': datetime.now()}}
+        ]
+        
+        return list(self.db.notifications.find(query)
+                   .sort('created_at', -1)
+                   .limit(limit))
+    
+    def mark_as_read(self, notification_id, user_id):
+        """Mark a notification as read"""
+        return self.db.notifications.update_one(
+            {
+                'notification_id': notification_id,
+                'user_id': user_id
+            },
+            {'$set': {'is_read': True}}
+        )
+    
+    def mark_all_as_read(self, user_id, user_type):
+        """Mark all notifications as read for a user"""
+        return self.db.notifications.update_many(
+            {
+                'user_id': user_id,
+                'user_type': user_type,
+                'is_read': False
+            },
+            {'$set': {'is_read': True}}
+        )
+    
+    def get_unread_count(self, user_id, user_type):
+        """Get count of unread notifications"""
+        query = {
+            'user_id': user_id,
+            'user_type': user_type,
+            'is_read': False
+        }
+        
+        # Add expiration filter
+        query['$or'] = [
+            {'expires_at': {'$exists': False}},
+            {'expires_at': None},
+            {'expires_at': {'$gt': datetime.now()}}
+        ]
+        
+        return self.db.notifications.count_documents(query)
+    
+    def create_bulk_notifications(self, notifications_data):
+        """Create multiple notifications at once"""
+        notifications = []
+        for data in notifications_data:
+            notification_data = {
+                'notification_id': generate_notification_id(),
+                'user_id': data['user_id'],
+                'user_type': data['user_type'],
+                'title': data['title'],
+                'message': data['message'],
+                'type': data['type'],
+                'priority': data.get('priority', 'medium'),
+                'related_id': data.get('related_id'),
+                'is_read': False,
+                'created_at': datetime.now(),
+                'expires_at': data.get('expires_at')
+            }
+            notifications.append(notification_data)
+        
+        if notifications:
+            return self.db.notifications.insert_many(notifications)
+        return None

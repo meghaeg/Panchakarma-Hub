@@ -33,6 +33,7 @@ class InMemoryDB:
             'appointments': [],
             'detox_appointments': [],
             'progress_tracking': [],
+            'notifications': [],
             'feedback': []
         }
         self._init_sample_data()
@@ -159,6 +160,10 @@ def generate_detox_appointment_id():
 def generate_progress_id():
     """Generate unique progress tracking ID"""
     return f"PROG{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+def generate_notification_id():
+    """Generate unique notification ID"""
+    return f"NOTIF{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
 def validate_aadhar(aadhar):
     """Validate Aadhar number format"""

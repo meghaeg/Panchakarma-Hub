@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash, current_app
 from datetime import datetime, timedelta
-from models import Patient, Centre, Doctor, Appointment, DetoxAppointment, Feedback, Admin, ProgressTracking
+from models import Patient, Centre, Doctor, Appointment, DetoxAppointment, Feedback, Admin, ProgressTracking, Notification
 from utils import *
 from email_service import *
 import json
@@ -850,14 +850,56 @@ def approve_detox():
             )
             
             if result:
-                # Send notification to patient
+                # Send email notification to patient
                 send_detox_approval_notification(appointment_data, doctor_data, therapy_time)
+                
+                # Create dashboard notifications
+                notification = Notification()
+                
+                # Patient notification
+                notification.create({
+                    'user_id': appointment_data['patient_id'],
+                    'user_type': 'patient',
+                    'title': '✅ Detox Therapy Approved!',
+                    'message': f'Your {appointment_data["schedule"]["plan_info"]["name"]} has been approved and assigned to Dr. {doctor_data["name"]} starting {appointment_data["start_date"]} at {therapy_time}.',
+                    'type': 'detox',
+                    'priority': 'high',
+                    'related_id': detox_appointment_id
+                })
+                
+                # Doctor notification
+                notification.create({
+                    'user_id': doctor_id,
+                    'user_type': 'doctor',
+                    'title': '👨‍⚕️ New Patient Assignment',
+                    'message': f'You have been assigned a new detox therapy patient for {appointment_data["schedule"]["plan_info"]["name"]} starting {appointment_data["start_date"]} at {therapy_time}.',
+                    'type': 'detox',
+                    'priority': 'medium',
+                    'related_id': detox_appointment_id
+                })
+                
+                # Send doctor assignment email
+                send_doctor_assignment_notification(doctor_data['email'], doctor_data['name'], appointment_data, appointment_data.get('patient_name', 'Patient'))
+                
                 message = f'Detox therapy approved and assigned to Dr. {doctor_data["name"]} at {therapy_time}'
             else:
                 message = 'Failed to assign doctor and time slot'
         else:
             detox_appointment.update_status(detox_appointment_id, 'rejected')
             send_detox_rejection_notification(appointment_data)
+            
+            # Create rejection notification for patient
+            notification = Notification()
+            notification.create({
+                'user_id': appointment_data['patient_id'],
+                'user_type': 'patient',
+                'title': '❌ Detox Therapy Request Update',
+                'message': f'Your {appointment_data["schedule"]["plan_info"]["name"]} request could not be approved at this time. Please contact your centre for more information.',
+                'type': 'detox',
+                'priority': 'medium',
+                'related_id': detox_appointment_id
+            })
+            
             message = 'Detox therapy rejected'
         
         return jsonify({'success': True, 'message': message})
@@ -1544,3 +1586,517 @@ def get_detox_progress(detox_appointment_id):
     except Exception as e:
         print(f"Error in get_detox_progress: {str(e)}")
         return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+# Notification Routes
+@patient_bp.route('/notifications')
+def patient_notifications():
+    """Get patient notifications"""
+    if session.get('role') != 'patient':
+        return redirect(url_for('auth.login'))
+    
+    user_id = session.get('user_id')
+    notification = Notification()
+    notifications = notification.find_by_user(user_id, 'patient')
+    unread_count = notification.get_unread_count(user_id, 'patient')
+    
+    return render_template('patient/notifications.html', 
+                         notifications=notifications, 
+                         unread_count=unread_count)
+
+
+@doctor_bp.route('/notifications')
+def doctor_notifications():
+    """Get doctor notifications"""
+    if session.get('role') != 'doctor':
+        return redirect(url_for('auth.login'))
+    
+    user_id = session.get('user_id')
+    notification = Notification()
+    notifications = notification.find_by_user(user_id, 'doctor')
+    unread_count = notification.get_unread_count(user_id, 'doctor')
+    
+    return render_template('doctor/notifications.html', 
+                         notifications=notifications, 
+                         unread_count=unread_count)
+
+
+@centre_bp.route('/notifications')
+def centre_notifications():
+    """Get centre notifications"""
+    if session.get('role') != 'centre':
+        return redirect(url_for('auth.login'))
+    
+    user_id = session.get('user_id')
+    notification = Notification()
+    notifications = notification.find_by_user(user_id, 'centre')
+    unread_count = notification.get_unread_count(user_id, 'centre')
+    
+    return render_template('centre/notifications.html', 
+                         notifications=notifications, 
+                         unread_count=unread_count)
+
+
+@patient_bp.route('/api/notifications')
+def api_patient_notifications():
+    """API endpoint for patient notifications"""
+    if session.get('role') != 'patient':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        user_id = session.get('user_id')
+        notification = Notification()
+        notifications = notification.find_by_user(user_id, 'patient', limit=20)
+        unread_count = notification.get_unread_count(user_id, 'patient')
+        
+        # Format notifications for JSON response
+        formatted_notifications = []
+        for notif in notifications:
+            formatted_notifications.append({
+                'id': notif['notification_id'],
+                'title': notif['title'],
+                'message': notif['message'],
+                'type': notif['type'],
+                'priority': notif['priority'],
+                'created_at': notif['created_at'].strftime('%Y-%m-%d %H:%M'),
+                'is_read': notif['is_read']
+            })
+        
+        return jsonify({
+            'success': True, 
+            'notifications': formatted_notifications,
+            'unread_count': unread_count
+        })
+        
+    except Exception as e:
+        print(f"Error in api_patient_notifications: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@doctor_bp.route('/api/notifications')
+def api_doctor_notifications():
+    """API endpoint for doctor notifications"""
+    if session.get('role') != 'doctor':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        user_id = session.get('user_id')
+        notification = Notification()
+        notifications = notification.find_by_user(user_id, 'doctor', limit=20)
+        unread_count = notification.get_unread_count(user_id, 'doctor')
+        
+        # Format notifications for JSON response
+        formatted_notifications = []
+        for notif in notifications:
+            formatted_notifications.append({
+                'id': notif['notification_id'],
+                'title': notif['title'],
+                'message': notif['message'],
+                'type': notif['type'],
+                'priority': notif['priority'],
+                'created_at': notif['created_at'].strftime('%Y-%m-%d %H:%M'),
+                'is_read': notif['is_read']
+            })
+        
+        return jsonify({
+            'success': True, 
+            'notifications': formatted_notifications,
+            'unread_count': unread_count
+        })
+        
+    except Exception as e:
+        print(f"Error in api_doctor_notifications: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@centre_bp.route('/api/notifications')
+def api_centre_notifications():
+    """API endpoint for centre notifications"""
+    if session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        user_id = session.get('user_id')
+        notification = Notification()
+        notifications = notification.find_by_user(user_id, 'centre', limit=20)
+        unread_count = notification.get_unread_count(user_id, 'centre')
+        
+        # Format notifications for JSON response
+        formatted_notifications = []
+        for notif in notifications:
+            formatted_notifications.append({
+                'id': notif['notification_id'],
+                'title': notif['title'],
+                'message': notif['message'],
+                'type': notif['type'],
+                'priority': notif['priority'],
+                'created_at': notif['created_at'].strftime('%Y-%m-%d %H:%M'),
+                'is_read': notif['is_read']
+            })
+        
+        return jsonify({
+            'success': True, 
+            'notifications': formatted_notifications,
+            'unread_count': unread_count
+        })
+        
+    except Exception as e:
+        print(f"Error in api_centre_notifications: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@patient_bp.route('/mark-notification-read/<notification_id>', methods=['POST'])
+def mark_patient_notification_read(notification_id):
+    """Mark a patient notification as read"""
+    if session.get('role') != 'patient':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        user_id = session.get('user_id')
+        notification = Notification()
+        result = notification.mark_as_read(notification_id, user_id)
+        
+        if result.modified_count > 0:
+            return jsonify({'success': True, 'message': 'Notification marked as read'})
+        else:
+            return jsonify({'success': False, 'message': 'Notification not found'})
+            
+    except Exception as e:
+        print(f"Error in mark_patient_notification_read: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@doctor_bp.route('/mark-notification-read/<notification_id>', methods=['POST'])
+def mark_doctor_notification_read(notification_id):
+    """Mark a doctor notification as read"""
+    if session.get('role') != 'doctor':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        user_id = session.get('user_id')
+        notification = Notification()
+        result = notification.mark_as_read(notification_id, user_id)
+        
+        if result.modified_count > 0:
+            return jsonify({'success': True, 'message': 'Notification marked as read'})
+        else:
+            return jsonify({'success': False, 'message': 'Notification not found'})
+            
+    except Exception as e:
+        print(f"Error in mark_doctor_notification_read: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@centre_bp.route('/mark-notification-read/<notification_id>', methods=['POST'])
+def mark_centre_notification_read(notification_id):
+    """Mark a centre notification as read"""
+    if session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        user_id = session.get('user_id')
+        notification = Notification()
+        result = notification.mark_as_read(notification_id, user_id)
+        
+        if result.modified_count > 0:
+            return jsonify({'success': True, 'message': 'Notification marked as read'})
+        else:
+            return jsonify({'success': False, 'message': 'Notification not found'})
+            
+    except Exception as e:
+        print(f"Error in mark_centre_notification_read: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@patient_bp.route('/mark-all-notifications-read', methods=['POST'])
+def mark_all_patient_notifications_read():
+    """Mark all patient notifications as read"""
+    if session.get('role') != 'patient':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        user_id = session.get('user_id')
+        notification = Notification()
+        result = notification.mark_all_as_read(user_id, 'patient')
+        
+        return jsonify({
+            'success': True, 
+            'message': f'{result.modified_count} notifications marked as read'
+        })
+        
+    except Exception as e:
+        print(f"Error in mark_all_patient_notifications_read: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@doctor_bp.route('/mark-all-notifications-read', methods=['POST'])
+def mark_all_doctor_notifications_read():
+    """Mark all doctor notifications as read"""
+    if session.get('role') != 'doctor':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        user_id = session.get('user_id')
+        notification = Notification()
+        result = notification.mark_all_as_read(user_id, 'doctor')
+        
+        return jsonify({
+            'success': True, 
+            'message': f'{result.modified_count} notifications marked as read'
+        })
+        
+    except Exception as e:
+        print(f"Error in mark_all_doctor_notifications_read: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@centre_bp.route('/mark-all-notifications-read', methods=['POST'])
+def mark_all_centre_notifications_read():
+    """Mark all centre notifications as read"""
+    if session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        user_id = session.get('user_id')
+        notification = Notification()
+        result = notification.mark_all_as_read(user_id, 'centre')
+        
+        return jsonify({
+            'success': True, 
+            'message': f'{result.modified_count} notifications marked as read'
+        })
+        
+    except Exception as e:
+        print(f"Error in mark_all_centre_notifications_read: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+# Precaution Notification Functions
+def send_precaution_notifications():
+    """Send precaution notifications for upcoming detox therapies"""
+    try:
+        detox_appointment = DetoxAppointment()
+        db = get_db_connection()
+        
+        # Get all confirmed detox appointments starting tomorrow
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+        
+        appointments = list(db.detox_appointments.find({
+            'start_date': tomorrow,
+            'status': 'confirmed'
+        }))
+        
+        notification = Notification()
+        
+        for appointment in appointments:
+            # Get patient details
+            patient = db.patients.find_one({'patient_id': appointment['patient_id']})
+            if not patient:
+                continue
+            
+            # Send pre-therapy precautions email
+            send_pre_therapy_precautions_notification(
+                patient['email'], 
+                patient['name'], 
+                appointment
+            )
+            
+            # Create dashboard notification
+            notification.create({
+                'user_id': appointment['patient_id'],
+                'user_type': 'patient',
+                'title': '⚠️ Pre-Therapy Precautions',
+                'message': f'Your detox therapy starts tomorrow! Please review the important precautions and preparations.',
+                'type': 'precaution',
+                'priority': 'high',
+                'related_id': appointment['detox_appointment_id'],
+                'expires_at': datetime.now() + timedelta(days=2)  # Expire after 2 days
+            })
+        
+        print(f"Sent precaution notifications for {len(appointments)} appointments")
+        return True
+        
+    except Exception as e:
+        print(f"Error sending precaution notifications: {str(e)}")
+        return False
+
+
+def send_daily_reminders():
+    """Send daily therapy reminders"""
+    try:
+        detox_appointment = DetoxAppointment()
+        db = get_db_connection()
+        
+        # Get all in-progress detox appointments
+        appointments = list(db.detox_appointments.find({
+            'status': 'in_progress'
+        }))
+        
+        notification = Notification()
+        
+        for appointment in appointments:
+            # Calculate current day
+            start_date = datetime.strptime(appointment['start_date'], '%Y-%m-%d')
+            current_day = (datetime.now() - start_date).days + 1
+            
+            if current_day <= appointment['schedule']['plan_info']['duration']:
+                # Get patient details
+                patient = db.patients.find_one({'patient_id': appointment['patient_id']})
+                if not patient:
+                    continue
+                
+                # Send daily reminder email
+                send_daily_therapy_reminder(
+                    patient['email'], 
+                    patient['name'], 
+                    appointment, 
+                    current_day
+                )
+                
+                # Create dashboard notification
+                notification.create({
+                    'user_id': appointment['patient_id'],
+                    'user_type': 'patient',
+                    'title': f'📅 Daily Therapy Reminder - Day {current_day}',
+                    'message': f'Your detox therapy session for day {current_day} is scheduled. Please arrive on time.',
+                    'type': 'reminder',
+                    'priority': 'medium',
+                    'related_id': appointment['detox_appointment_id'],
+                    'expires_at': datetime.now() + timedelta(days=1)  # Expire after 1 day
+                })
+        
+        print(f"Sent daily reminders for {len(appointments)} appointments")
+        return True
+        
+    except Exception as e:
+        print(f"Error sending daily reminders: {str(e)}")
+        return False
+
+
+def send_completion_notifications():
+    """Send post-therapy completion notifications"""
+    try:
+        detox_appointment = DetoxAppointment()
+        db = get_db_connection()
+        
+        # Get all detox appointments that completed today
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        appointments = list(db.detox_appointments.find({
+            'status': 'in_progress'
+        }))
+        
+        notification = Notification()
+        completed_count = 0
+        
+        for appointment in appointments:
+            # Calculate if therapy should be completed today
+            start_date = datetime.strptime(appointment['start_date'], '%Y-%m-%d')
+            duration = appointment['schedule']['plan_info']['duration']
+            
+            # Calculate end date (skipping Sundays)
+            end_date = start_date
+            day_count = 0
+            while day_count < duration:
+                day_of_week = end_date.strftime('%A').lower()
+                if day_of_week != 'sunday':
+                    day_count += 1
+                end_date += timedelta(days=1)
+            
+            if end_date.strftime('%Y-%m-%d') == today:
+                # Get patient details
+                patient = db.patients.find_one({'patient_id': appointment['patient_id']})
+                if not patient:
+                    continue
+                
+                # Update status to completed
+                detox_appointment.update_status(appointment['detox_appointment_id'], 'completed')
+                
+                # Send completion email
+                send_post_therapy_precautions_notification(
+                    patient['email'], 
+                    patient['name'], 
+                    appointment
+                )
+                
+                # Create dashboard notification
+                notification.create({
+                    'user_id': appointment['patient_id'],
+                    'user_type': 'patient',
+                    'title': '🏁 Therapy Completed!',
+                    'message': f'Congratulations! Your {appointment["schedule"]["plan_info"]["name"]} has been completed. Please review the post-therapy care instructions.',
+                    'type': 'completion',
+                    'priority': 'high',
+                    'related_id': appointment['detox_appointment_id']
+                })
+                
+                completed_count += 1
+        
+        print(f"Sent completion notifications for {completed_count} appointments")
+        return True
+        
+    except Exception as e:
+        print(f"Error sending completion notifications: {str(e)}")
+        return False
+
+
+# Scheduled notification routes (can be called by cron jobs or scheduled tasks)
+@patient_bp.route('/send-precaution-notifications', methods=['POST'])
+def send_precaution_notifications_route():
+    """Route to send precaution notifications (for scheduled tasks)"""
+    if send_precaution_notifications():
+        return jsonify({'success': True, 'message': 'Precaution notifications sent successfully'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to send precaution notifications'})
+
+
+@patient_bp.route('/send-daily-reminders', methods=['POST'])
+def send_daily_reminders_route():
+    """Route to send daily reminders (for scheduled tasks)"""
+    if send_daily_reminders():
+        return jsonify({'success': True, 'message': 'Daily reminders sent successfully'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to send daily reminders'})
+
+
+@patient_bp.route('/send-completion-notifications', methods=['POST'])
+def send_completion_notifications_route():
+    """Route to send completion notifications (for scheduled tasks)"""
+    if send_completion_notifications():
+        return jsonify({'success': True, 'message': 'Completion notifications sent successfully'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to send completion notifications'})
+
+
+# Email Testing Routes
+@patient_bp.route('/test-email', methods=['POST'])
+def test_email():
+    """Test email functionality"""
+    try:
+        data = request.get_json()
+        test_email_address = data.get('email')
+        
+        if not test_email_address:
+            return jsonify({'success': False, 'message': 'Email address required'})
+        
+        # Test email connection first
+        from email_service import test_email_connection, send_test_email
+        
+        if not test_email_connection():
+            return jsonify({'success': False, 'message': 'Email connection failed. Please check credentials.'})
+        
+        # Send test email
+        if send_test_email(test_email_address):
+            return jsonify({'success': True, 'message': f'Test email sent successfully to {test_email_address}'})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to send test email'})
+            
+    except Exception as e:
+        print(f"Error in test_email: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@patient_bp.route('/email-test-page')
+def email_test_page():
+    """Serve email test page"""
+    return render_template('email_test.html')

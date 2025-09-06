@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-bell text-primary"></i> Notifications</h2>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" onclick="markAllAsRead()">
+                        <i class="fas fa-check-double"></i> Mark All as Read
+                    </button>
+                    <a href="/centre/dashboard" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification Count -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                You have <strong>{{ unread_count }}</strong> unread notifications
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notifications List -->
+    <div class="row">
+        <div class="col-12">
+            {% if notifications %}
+                <div class="list-group">
+                    {% for notification in notifications %}
+                    <div class="list-group-item {% if not notification.is_read %}list-group-item-light{% endif %} notification-item" 
+                         data-notification-id="{{ notification.notification_id }}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 d-flex align-items-center">
+                                    {% if notification.priority == 'urgent' %}
+                                        <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+                                    {% elif notification.priority == 'high' %}
+                                        <i class="fas fa-exclamation-circle text-warning me-2"></i>
+                                    {% elif notification.priority == 'medium' %}
+                                        <i class="fas fa-info-circle text-info me-2"></i>
+                                    {% else %}
+                                        <i class="fas fa-bell text-secondary me-2"></i>
+                                    {% endif %}
+                                    
+                                    {{ notification.title }}
+                                    
+                                    {% if not notification.is_read %}
+                                        <span class="badge bg-primary ms-2">New</span>
+                                    {% endif %}
+                                </h6>
+                                <p class="mb-1">{{ notification.message }}</p>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock"></i> {{ notification.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                    <span class="ms-3">
+                                        <i class="fas fa-tag"></i> {{ notification.type.title() }}
+                                    </span>
+                                </small>
+                            </div>
+                            <div class="d-flex flex-column align-items-end">
+                                {% if not notification.is_read %}
+                                <button class="btn btn-sm btn-outline-primary mb-2" 
+                                        onclick="markAsRead('{{ notification.notification_id }}')">
+                                    <i class="fas fa-check"></i> Mark as Read
+                                </button>
+                                {% endif %}
+                                
+                                {% if notification.type == 'detox' and notification.related_id %}
+                                <a href="/centre/detox-schedule/{{ notification.related_id }}" 
+                                   class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-calendar-alt"></i> View Schedule
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No Notifications</h5>
+                    <p class="text-muted">You're all caught up! Check back later for updates.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function markAsRead(notificationId) {
+    fetch(`/centre/mark-notification-read/${notificationId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove the notification from the list
+            const notificationItem = document.querySelector(`[data-notification-id="${notificationId}"]`);
+            if (notificationItem) {
+                notificationItem.classList.remove('list-group-item-light');
+                notificationItem.classList.add('list-group-item-secondary');
+                
+                // Remove the "Mark as Read" button
+                const markButton = notificationItem.querySelector('button');
+                if (markButton) {
+                    markButton.remove();
+                }
+                
+                // Remove the "New" badge
+                const newBadge = notificationItem.querySelector('.badge');
+                if (newBadge) {
+                    newBadge.remove();
+                }
+            }
+            
+            // Update unread count
+            updateUnreadCount();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error marking notification as read');
+    });
+}
+
+function markAllAsRead() {
+    if (confirm('Are you sure you want to mark all notifications as read?')) {
+        fetch('/centre/mark-all-notifications-read', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Reload the page to show updated notifications
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error marking all notifications as read');
+        });
+    }
+}
+
+function updateUnreadCount() {
+    fetch('/centre/api/notifications')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const unreadCountElement = document.querySelector('.alert-info strong');
+                if (unreadCountElement) {
+                    unreadCountElement.textContent = data.unread_count;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error updating unread count:', error);
+        });
+}
+
+// Auto-refresh notifications every 30 seconds
+setInterval(updateUnreadCount, 30000);
+</script>
+{% endblock %}
