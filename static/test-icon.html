@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SVG Test</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .test-container {
+            margin: 20px;
+            text-align: center;
+        }
+        .direct-svg {
+            width: 100px;
+            height: 100px;
+        }
+        .bg-image {
+            width: 100px;
+            height: 100px;
+            background-image: url('/static/img/chatbot-icon.svg');
+            background-size: cover;
+            border-radius: 50%;
+        }
+        .relative-bg-image {
+            width: 100px;
+            height: 100px;
+            background-image: url('../img/chatbot-icon.svg');
+            background-size: cover;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <h1>SVG Display Test</h1>
+    
+    <div class="test-container">
+        <h2>Direct SVG Embed</h2>
+        <img src="/static/img/chatbot-icon.svg" class="direct-svg">
+    </div>
+    
+    <div class="test-container">
+        <h2>Absolute Path Background</h2>
+        <div class="bg-image"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>Relative Path Background</h2>
+        <div class="relative-bg-image"></div>
+    </div>
+</body>
+</html>

@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from flask_cors import CORS
 import os
+import requests
 from datetime import datetime, timedelta
 import secrets
 
@@ -33,6 +34,20 @@ def privacy_policy():
 @app.route('/terms-of-service')
 def terms_of_service():
     return render_template('terms_of_service.html')
+
+@app.route('/api/chat', methods=['POST'])
+def chat_proxy():
+    """Proxy endpoint for the Ayurveda chatbot"""
+    try:
+        # Forward the request to the chatbot backend
+        response = requests.post(
+            'http://127.0.0.1:5000/chat',
+            json=request.json,
+            headers={'Content-Type': 'application/json'}
+        )
+        return jsonify(response.json())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/dashboard')
 def dashboard():

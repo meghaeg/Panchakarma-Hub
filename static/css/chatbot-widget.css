@@ -1,0 +1,219 @@
+/* Chatbot Widget CSS */
+
+:root {
+    --primary-color: #556B2F; /* Dark Olive Green */
+    --secondary-color: #F4A460; /* Sandy Brown/Sandal */
+    --accent-color: #8FBC8F; /* Dark Sea Green */
+    --light-green: #F0F8E8;
+    --dark-green: #3C5A14;
+    --text-dark: #2C3E50;
+    --text-light: #6C757D;
+}
+
+.ayurveda-chatbot-widget {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    font-family: 'Poppins', sans-serif;
+    transition: none; /* Remove transition when dragging */
+    cursor: move; /* Indicate draggable */
+}
+
+/* Chat Icon */
+.chat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-color), var(--primary-color));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    background-image: url('/static/img/chatbot-icon.svg');
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.chat-icon:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.chat-icon i {
+    font-size: 28px;
+}
+
+/* Chat Window */
+.chat-window {
+    position: absolute;
+    bottom: 80px;
+    right: 0;
+    width: 350px;
+    height: 500px;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    z-index: 9998; /* Just below the widget container */
+}
+
+/* Chat Header */
+.chat-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--dark-green));
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.chat-header i {
+    margin-right: 8px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+}
+
+/* Chat Messages */
+.chat-messages {
+    flex-grow: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background-color: #f9f9f9;
+}
+
+.chat-message {
+    margin-bottom: 15px;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
+.chat-message.user {
+    margin-left: auto;
+    background-color: var(--light-green);
+    border-radius: 18px 18px 0 18px;
+    padding: 10px 15px;
+    color: var(--text-dark);
+}
+
+.chat-message.assistant {
+    margin-right: auto;
+    background-color: white;
+    border-radius: 18px 18px 18px 0;
+    padding: 10px 15px;
+    color: var(--text-dark);
+    border-left: 3px solid var(--secondary-color);
+}
+
+/* Chat Input */
+.chat-input {
+    display: flex;
+    padding: 10px 15px;
+    background-color: white;
+    border-top: 1px solid #eee;
+}
+
+.chat-input input {
+    flex-grow: 1;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    padding: 8px 15px;
+    outline: none;
+    font-family: 'Poppins', sans-serif;
+}
+
+.chat-input input:focus {
+    border-color: var(--primary-color);
+}
+
+.send-btn {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    margin-left: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease;
+}
+
+.send-btn:hover {
+    background-color: var(--dark-green);
+}
+
+/* Typing Indicator */
+.typing-indicator {
+    display: flex;
+    padding: 6px 10px;
+}
+
+.typing-indicator span {
+    height: 8px;
+    width: 8px;
+    margin: 0 1px;
+    background-color: #bbb;
+    border-radius: 50%;
+    display: inline-block;
+    opacity: 0.4;
+}
+
+.typing-indicator span:nth-child(1) {
+    animation: pulse 1s infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation: pulse 1s infinite 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+    animation: pulse 1s infinite 0.4s;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 0.4;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+    100% {
+        opacity: 0.4;
+        transform: scale(1);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .chat-window {
+        width: 300px;
+        height: 450px;
+        bottom: 70px;
+        right: 0;
+    }
+}
