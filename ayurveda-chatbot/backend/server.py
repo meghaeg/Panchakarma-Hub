@@ -8,6 +8,9 @@ from flask import Flask, request, jsonify
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+print("Loaded GROQ_API_KEY:", "FOUND" if GROQ_API_KEY else "MISSING")
+
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = "llama-3.1-8b-instant"
 
@@ -38,7 +41,7 @@ def get_groq_response(messages, temperature=0.5):
     return {"reply": data["choices"][0]["message"]["content"]}
 
 # Flask route for chatbot
-@app.route("/chat", methods=["POST"])
+@app.route("/api/chat", methods=["POST"])
 def chat():
     data = request.json
     messages = data.get("messages", [])

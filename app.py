@@ -4,6 +4,7 @@ import os
 import requests
 from datetime import datetime, timedelta
 import secrets
+import logging
 
 # Import our modules
 from utils import get_db_connection
@@ -14,6 +15,9 @@ from email_service import send_email
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 CORS(app)
+
+# Setup logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Register blueprints
 app.register_blueprint(auth_bp)
@@ -39,14 +43,25 @@ def terms_of_service():
 def chat_proxy():
     """Proxy endpoint for the Ayurveda chatbot"""
     try:
-        # Forward the request to the chatbot backend
+        logging.debug(f"Proxy received: {request.json}")
+
         response = requests.post(
-            'http://127.0.0.1:5000/chat',
+            'http://127.0.0.1:5000/api/chat',   # backend server.py
             json=request.json,
             headers={'Content-Type': 'application/json'}
         )
-        return jsonify(response.json())
+
+        logging.debug(f"Backend status: {response.status_code}, response: {response.text}")
+
+        # Forward backend response + status code
+        return jsonify(response.json()), response.status_code
+
+    except requests.exceptions.ConnectionError:
+        logging.error("Backend server not reachable on port 5000")
+        return jsonify({'error': 'Backend server not reachable on port 5000'}), 502
+
     except Exception as e:
+        logging.exception("Error in chat_proxy")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/dashboard')
