@@ -24,6 +24,12 @@ A comprehensive web application for managing Panchakarma therapy services with r
 - Feedback and rating system
 - Medical history and reports
 
+### 🗣️ **Voice Mode (Accessibility Add-on)**
+- Web Speech API powered voice assistant (Chrome recommended)
+- Voice-only flow for Start, Login (Aadhaar + Password), Patient Dashboard, and Detox Booking
+- Guided prompts, confirmations, and error handling
+- Non-intrusive floating toggle; normal site usage remains intact
+
 ## Technology Stack
 
 - **Backend**: Python Flask
@@ -105,6 +111,30 @@ A comprehensive web application for managing Panchakarma therapy services with r
 5. **Track Progress**: View daily progress updates and vitals
 6. **Complete Therapy**: Receive summary report via email
 7. **Submit Feedback**: Rate doctor and centre experience
+
+### 🗣️ Voice Mode - How to Use
+
+1. **Open the app** and click the round microphone button at the bottom-right to enable Voice Mode.
+2. On the **Start/Landing page**, the assistant says: “If you want to continue exploring Panchakarma services, say Yes and Continue. If not, click the cross and continue.”
+   - Say “Yes” to navigate to Patient Login.
+   - Say “No” to close Voice Mode.
+3. On **Patient Login**, speak your 12-digit Aadhaar and then your password. Confirm to submit.
+   - Invalid credentials trigger: “Invalid credentials. Please try again.”
+4. On **Patient Dashboard**, the assistant asks: “Would you like to Book Detox Therapy or open the Detox Dashboard?”
+   - Say “Book Detox Therapy” or “Detox Dashboard”.
+5. On **Book Detox Therapy**, follow the guided steps:
+   - Choose centre (assistant reads out available centres)
+   - Choose detox plan
+   - Speak preferred date (e.g., “20 September 2025”)
+   - Confirm: “You selected Centre: X, Plan: Y, Date: Z. Shall I submit? Yes or No.”
+6. **After Booking**:
+   - The assistant asks: “For more details, do you want to go to the Detox Dashboard?”
+   - If “No”, it asks: “Do you want to sign out?”
+
+Notes:
+- If the assistant can’t understand you, it says: “I didn’t catch that, please repeat.”
+- Voice Mode is an accessibility feature. You can still use the portal normally.
+- Browser support: Chrome (Web Speech API). Other browsers may have limited or no support.
 
 ### 🏥 **Centre Operations**
 1. **Registration**: Apply for approval with license details

@@ -2,6 +2,10 @@
 
 {% block title %}Panchakarma Therapy Management Portal - Authentic Ayurvedic Healing{% endblock %}
 
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/centres.js') }}"></script>
+{% endblock %}
+
 {% block content %}
 <!-- Hero Section -->
 <section class="hero-section">
@@ -138,44 +142,21 @@
         <div class="row g-4">
             <div class="col-lg-8">
                 <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-hospital"></i> Featured Centers</h5>
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <h5 class="mb-0"><i class="fas fa-hospital"></i> NABH Centres Near You</h5>
+                        <small class="text-white-50">Location access requested on load</small>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <div class="border-start border-primary border-4 ps-3">
-                                    <h6 class="fw-bold">Ayurvedic Healing Center</h6>
-                                    <p class="text-muted mb-1">Kerala, India</p>
-                                    <span class="badge bg-success">NABH Accredited</span>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="border-start border-primary border-4 ps-3">
-                                    <h6 class="fw-bold">Panchakarma Wellness Resort</h6>
-                                    <p class="text-muted mb-1">Rishikesh, Uttarakhand</p>
-                                    <span class="badge bg-success">NABH Accredited</span>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="border-start border-primary border-4 ps-3">
-                                    <h6 class="fw-bold">Traditional Ayurveda Hospital</h6>
-                                    <p class="text-muted mb-1">Bangalore, Karnataka</p>
-                                    <span class="badge bg-success">NABH Accredited</span>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="border-start border-primary border-4 ps-3">
-                                    <h6 class="fw-bold">Holistic Health Center</h6>
-                                    <p class="text-muted mb-1">Pune, Maharashtra</p>
-                                    <span class="badge bg-success">NABH Accredited</span>
-                                </div>
-                            </div>
+                        <div id="centres-status" class="alert alert-secondary mb-3" role="status">Preparing…</div>
+                        <div id="centres-scroll-container" style="max-height: 420px; overflow:auto;">
+                            <ul id="centres-list" class="list-group list-group-flush">
+                                <!-- dynamically filled by static/js/centres.js -->
+                            </ul>
                         </div>
                         <div class="text-center mt-3">
                             <a href="https://portal.nabh.co/frmViewAccreditedPanchkarma.aspx#gsc.tab=0" 
                                target="_blank" class="btn btn-primary">
-                                <i class="fas fa-external-link-alt"></i> View All NABH Centers
+                                <i class="fas fa-external-link-alt"></i> Verify on NABH Portal
                             </a>
                         </div>
                     </div>

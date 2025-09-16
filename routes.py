@@ -3,9 +3,11 @@ from datetime import datetime, timedelta
 from models import Patient, Centre, Doctor, Appointment, DetoxAppointment, Feedback, Admin, ProgressTracking, Notification
 from utils import *
 from email_service import *
+from sms_service import send_sms
 import json
 import csv
 from io import StringIO
+import re
 
 # Create blueprints
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -25,10 +27,58 @@ def login():
         role = data.get('role')
         
         if role == 'patient':
-            # For patients, use Aadhar instead of email
-            aadhar = data.get('aadhar')
+            # Support username+password (voice mode) OR aadhar+password (existing)
             patient = Patient()
-            user = patient.find_by_aadhar(aadhar)
+            username = (data.get('username') or '').strip()
+            user = None
+            if username:
+                # Accept username as patient's name or email (case-insensitive, exact match)
+                # Detect DB mode (Atlas vs InMemory)
+                try:
+                    from utils import InMemoryDB  # type: ignore
+                    is_inmem = isinstance(patient.db, InMemoryDB)
+                except Exception:
+                    is_inmem = False
+
+                # If username looks like a 12-digit number, treat as Aadhaar directly
+                if re.fullmatch(r"\d{12}", username):
+                    user = patient.find_by_aadhar(username)
+                elif is_inmem:
+                    # Python-side case-insensitive exact match for name/email
+                    uname = username.lower()
+                    try:
+                        candidates = patient.db.patients.find()
+                    except Exception:
+                        candidates = []
+                    for doc in candidates:
+                        email = str(doc.get('email', '')).lower()
+                        name = str(doc.get('name', '')).lower()
+                        if email == uname or name == uname:
+                            user = doc
+                            break
+                else:
+                    def ci_exact(field, value):
+                        pattern = f"^{re.escape(value)}$"
+                        return patient.db.patients.find_one({field: {"$regex": pattern, "$options": "i"}})
+                    if '@' in username:
+                        user = ci_exact('email', username)
+                        if not user:
+                            # Some users may say their name even if '@' present accidentally; fallback to name
+                            user = ci_exact('name', username)
+                    else:
+                        user = ci_exact('name', username)
+                    # As a fallback, allow partial, case-insensitive name contains if exact not found
+                    if not user:
+                        try:
+                            user = patient.db.patients.find_one({
+                                'name': {"$regex": re.escape(username), "$options": "i"}
+                            })
+                        except Exception:
+                            user = None
+            else:
+                # Fallback to existing Aadhaar-based login
+                aadhar = data.get('aadhar')
+                user = patient.find_by_aadhar(aadhar)
             if user and patient.check_password(password, user['password']):
                 session['user_id'] = user['patient_id']
                 session['role'] = 'patient'
@@ -221,6 +271,25 @@ def send_appointment_confirmation_to_patient(appointment_data):
         """
         
         send_email(patient_info['email'], subject, body)
+
+        # Also send SMS notification to patient
+        try:
+            # Format date for SMS (supports both str and datetime)
+            apt_date = appointment_data.get('appointment_date')
+            if hasattr(apt_date, 'strftime'):
+                date_str = apt_date.strftime('%Y-%m-%d')
+            else:
+                date_str = str(apt_date)
+            time_slot = appointment_data.get('time_slot', '')
+            doctor_name = appointment_data.get('assigned_doctor', 'TBD')
+            msg = (
+                f"Appointment Confirmed: ID {appointment_data['appointment_id']} on {date_str} at {time_slot}. "
+                f"Therapy: {appointment_data['therapy_type']}. Doctor: {doctor_name}. - Panchakarma Portal"
+            )
+            if patient_info.get('phone'):
+                send_sms(patient_info['phone'], msg)
+        except Exception as e:
+            print(f"SMS send (patient confirmation) failed: {e}")
 
 def send_appointment_rejection_to_patient(appointment_data):
     """Send appointment rejection email to patient"""
@@ -707,6 +776,78 @@ def assign_doctor():
         
         send_doctor_assignment(patient_data['email'], patient_data['name'], doctor_data)
         send_appointment_confirmation_to_patient(apt_data)
+
+        # Also send SMS notifications
+        try:
+            # Build formatted date string
+            apt_date = apt_data.get('appointment_date')
+            if hasattr(apt_date, 'strftime'):
+                date_str = apt_date.strftime('%Y-%m-%d')
+            else:
+                date_str = str(apt_date)
+
+            # Patient SMS: doctor assigned
+            if patient_data and patient_data.get('phone'):
+                p_msg = (
+                    f"Doctor Assigned: Dr {doctor_data.get('name', '')} for Appointment {apt_data['appointment_id']} "
+                    f"on {date_str} at {assigned_time_slot}. Therapy: {apt_data.get('therapy_type', '')}. "
+                    f"- Panchakarma Portal"
+                )
+                send_sms(patient_data['phone'], p_msg)
+
+            # Doctor SMS: patient details
+            if doctor_data and doctor_data.get('phone'):
+                # Fetch centre info for context (optional)
+                centre = Centre()
+                centre_info = centre.find_by_id(apt_data.get('centre_id')) if apt_data.get('centre_id') else None
+                c_name = centre_info.get('name', '') if centre_info else ''
+
+                # Ensure patient phone present
+                patient_phone = patient_data.get('phone', '') if patient_data else ''
+                d_msg = (
+                    f"New Assignment: Patient {patient_data.get('name', 'Unknown')} (Ph: {patient_phone}) "
+                    f"for {apt_data.get('therapy_type', '')} on {date_str} {assigned_time_slot}. "
+                    f"Appt ID: {apt_data['appointment_id']}. {('Centre: ' + c_name) if c_name else ''}"
+                )
+                send_sms(doctor_data['phone'], d_msg)
+        except Exception as e:
+            print(f"SMS send (doctor assignment) failed: {e}")
+
+        # Additionally, email the doctor basic patient details
+        try:
+            if doctor_data and doctor_data.get('email'):
+                subject = "New Appointment Assigned - Patient Details"
+                # Format date again for email
+                apt_date = apt_data.get('appointment_date')
+                if hasattr(apt_date, 'strftime'):
+                    date_str = apt_date.strftime('%Y-%m-%d')
+                else:
+                    date_str = str(apt_date)
+                body = f"""
+                Dear Dr. {doctor_data.get('name', '')},
+                
+                You have been assigned a new appointment.
+                
+                Appointment Details:
+                - Appointment ID: {apt_data['appointment_id']}
+                - Date: {date_str}
+                - Time: {assigned_time_slot}
+                - Therapy Type: {apt_data.get('therapy_type', '')}
+                - Centre: {c_name if 'c_name' in locals() else ''}
+                
+                Patient Details:
+                - Name: {patient_data.get('name', 'Unknown')}
+                - Email: {patient_data.get('email', '')}
+                - Phone: {patient_data.get('phone', '')}
+                
+                Please log into your dashboard for more information.
+                
+                Best regards,
+                Panchakarma Portal Team
+                """
+                send_email(doctor_data['email'], subject, body)
+        except Exception as e:
+            print(f"Doctor assignment email (to doctor) failed: {e}")
         
         return jsonify({
             'success': True, 
@@ -881,6 +1022,23 @@ def approve_detox():
                 # Send doctor assignment email
                 send_doctor_assignment_notification(doctor_data['email'], doctor_data['name'], appointment_data, appointment_data.get('patient_name', 'Patient'))
                 
+                # Send SMS to doctor with patient details
+                try:
+                    patient_model = Patient()
+                    patient_info = patient_model.find_by_id(appointment_data['patient_id'])
+                    centre_model = Centre()
+                    centre_info = centre_model.find_by_id(appointment_data.get('centre_id')) if appointment_data.get('centre_id') else None
+                    c_name = centre_info.get('name', '') if centre_info else ''
+                    if doctor_data.get('phone'):
+                        d_msg = (
+                            f"Detox Assignment: Patient {patient_info.get('name','Patient')} (Ph: {patient_info.get('phone','')}) "
+                            f"Plan: {appointment_data['schedule']['plan_info']['name']} starting {appointment_data.get('start_date')} at {therapy_time}. "
+                            f"{('Centre: ' + c_name) if c_name else ''}"
+                        )
+                        send_sms(doctor_data['phone'], d_msg)
+                except Exception as e:
+                    print(f"SMS send (detox doctor assignment) failed: {e}")
+                
                 message = f'Detox therapy approved and assigned to Dr. {doctor_data["name"]} at {therapy_time}'
             else:
                 message = 'Failed to assign doctor and time slot'
@@ -951,6 +1109,19 @@ def send_detox_approval_notification(appointment_data, doctor, time_slot):
         
         send_email(patient_info['email'], subject, body)
 
+        # SMS to patient
+        try:
+            plan_name = appointment_data['schedule']['plan_info']['name']
+            start_date = appointment_data.get('start_date')
+            msg = (
+                f"Detox Approved: {plan_name} starting {start_date} at {time_slot}. "
+                f"Doctor: Dr {doctor.get('name','')}. - Panchakarma Portal"
+            )
+            if patient_info.get('phone'):
+                send_sms(patient_info['phone'], msg)
+        except Exception as e:
+            print(f"SMS send (detox approval to patient) failed: {e}")
+
 def send_detox_rejection_notification(appointment_data):
     """Send detox rejection notification to patient"""
     patient = Patient()
@@ -973,6 +1144,19 @@ def send_detox_rejection_notification(appointment_data):
         """
         
         send_email(patient_info['email'], subject, body)
+
+        # SMS to patient
+        try:
+            plan_name = appointment_data['schedule']['plan_info']['name']
+            start_date = appointment_data.get('start_date')
+            msg = (
+                f"Detox Request Update: {plan_name} for {start_date} not approved. "
+                f"Please contact your centre. - Panchakarma Portal"
+            )
+            if patient_info.get('phone'):
+                send_sms(patient_info['phone'], msg)
+        except Exception as e:
+            print(f"SMS send (detox rejection to patient) failed: {e}")
 
 # Doctor Routes
 @doctor_bp.route('/dashboard')

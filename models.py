@@ -13,8 +13,13 @@ class User:
         return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     
     def check_password(self, password, hashed):
-        """Check password against hash"""
-        return bcrypt.checkpw(password.encode('utf-8'), hashed)
+        """Check password against hash (accepts bytes or str)"""
+        try:
+            if isinstance(hashed, str):
+                hashed = hashed.encode('utf-8')
+            return bcrypt.checkpw(password.encode('utf-8'), hashed)
+        except Exception:
+            return False
 
 class Patient(User):
     def create(self, data):

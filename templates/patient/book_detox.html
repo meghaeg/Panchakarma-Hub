@@ -75,6 +75,11 @@
 </div>
 
 <script>
+// Expose centres to the Voice Assistant from the DOM, for better TTS listing
+window.CENTRES = Array.from(document.querySelectorAll('#centre_id option'))
+  .filter(o => o.value)
+  .map(o => ({ centre_id: o.value, name: o.textContent.trim() }));
+
 document.getElementById('detoxBookingForm').addEventListener('submit', function(e) {
     e.preventDefault();
     

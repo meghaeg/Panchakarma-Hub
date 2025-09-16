@@ -194,6 +194,57 @@
             border-radius: 10px;
             padding: 20px;
         }
+        
+        /* Voice Assistant UI */
+        #voice-assistant-toggle {
+            position: fixed;
+            left: 22px;
+            bottom: 22px;
+            z-index: 10050;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(45deg, var(--secondary-color), #DEB887);
+            color: #1a1a1a;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+        #voice-assistant-toggle:hover {
+            transform: translateY(-2px);
+        }
+        #voice-assistant-panel {
+            position: fixed;
+            left: 22px;
+            bottom: 90px;
+            width: 360px;
+            max-width: calc(100% - 44px);
+            background: rgba(255,255,255,0.98);
+            border-radius: 12px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+            overflow: hidden;
+            z-index: 10050;
+            display: none;
+        }
+        #voice-assistant-panel .vap-header {
+            background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+            color: #fff;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #voice-assistant-panel .vap-body {
+            max-height: 300px;
+            overflow: auto;
+            padding: 10px 14px;
+        }
+        #voice-assistant-panel .vap-row {
+            margin-bottom: 6px;
+            font-size: 0.95rem;
+        }
     </style>
 
     {% block extra_css %}{% endblock %}
@@ -343,6 +394,63 @@
     </script>
     
     {% block extra_js %}{% endblock %}
+    
+    <!-- Voice Assistant UI -->
+    <div id="voice-assistant-toggle" title="Voice Mode" aria-label="Voice Mode">
+        <i class="fas fa-microphone"></i>
+    </div>
+    <div id="voice-assistant-panel" aria-live="polite" aria-label="Voice Assistant Panel">
+        <div class="vap-header">
+            <div>
+                <i class="fas fa-microphone"></i>
+                <span class="ms-2">Voice Assistant</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <small id="vap-status-text">Idle</small>
+                <button id="vap-close" class="btn btn-sm btn-light" aria-label="Close Voice Assistant">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="vap-body" id="vap-log" role="log"></div>
+    </div>
+
+    <!-- Voice Assistant Script -->
+    <script src="{{ url_for('static', filename='js/voice_helper.js') }}"></script>
+    <script>
+      // Expose minimal session info to JS for voice assistant
+      window.SESSION = {
+        user_id: "{{ session.get('user_id') or '' }}",
+        role: "{{ session.get('role') or '' }}",
+        name: "{{ session.get('name') or '' }}"
+      };
+
+      document.addEventListener('DOMContentLoaded', function(){
+        if (window.VoiceAssistant){
+          const assistant = new window.VoiceAssistant({
+            panelSelector: '#voice-assistant-panel',
+            toggleSelector: '#voice-assistant-toggle'
+          });
+          window.PK_VOICE = assistant;
+
+          // Persist open/close state across pages
+          const origOpen = assistant.open.bind(assistant);
+          assistant.open = async function(){
+            sessionStorage.setItem('pk_voice_open', '1');
+            return origOpen();
+          };
+          const origClose = assistant.close.bind(assistant);
+          assistant.close = function(){
+            sessionStorage.removeItem('pk_voice_open');
+            return origClose();
+          };
+
+          if (sessionStorage.getItem('pk_voice_open') === '1'){
+            assistant.open();
+          }
+        }
+      });
+    </script>
     
     <!-- Chatbot Widget JS -->
     {% if not session.user_id %}
