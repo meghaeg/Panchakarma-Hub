@@ -201,6 +201,16 @@
                 </div>
             </div>
 
+            <!-- Today's Zoom Meetings -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-video"></i> Scheduled Zoom Meetings (Today)</h5>
+                </div>
+                <div class="card-body">
+                    <div id="doctorZoomList" class="small text-muted">Loading…</div>
+                </div>
+            </div>
+
             <!-- Quick Actions -->
             <div class="card mt-3">
                 <div class="card-header">
@@ -538,5 +548,39 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Load doctor's Zoom meetings
+(async function loadDoctorZoom() {
+    try {
+        const res = await fetch('/doctor/api/zoom-meetings');
+        const data = await res.json();
+        const box = document.getElementById('doctorZoomList');
+        if (!data.success || !data.items || data.items.length === 0) {
+            box.textContent = 'No Zoom meetings today.';
+            return;
+        }
+        box.innerHTML = '';
+        data.items.forEach(it => {
+            const line = document.createElement('div');
+            line.className = 'mb-2';
+            const startLink = it.start_url ? `<a class=\"btn btn-sm btn-primary\" target=\"_blank\" href=\"${it.start_url}\">Start</a>` : '';
+            const endBtn = `<button class=\"btn btn-sm btn-danger ms-2\" onclick=\"endZoom('${it.zoom_meeting_id}')\">End</button>`;
+            line.innerHTML = `<strong>${it.slot}</strong> ${startLink} ${endBtn}`;
+            box.appendChild(line);
+        });
+    } catch(e) {
+        const box = document.getElementById('doctorZoomList');
+        box.textContent = 'Failed to load.';
+    }
+})();
+
+async function endZoom(id) {
+    if (!confirm('End this meeting for all participants?')) return;
+    try {
+        const res = await fetch('/doctor/end-zoom-meeting', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ zoom_meeting_id: id })});
+        const data = await res.json();
+        if (data.success) { alert('Meeting ended'); location.reload(); } else { alert(data.message || 'Failed to end'); }
+    } catch(e) { alert('Failed to end'); }
+}
 </script>
 {% endblock %}

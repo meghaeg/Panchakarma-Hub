@@ -601,11 +601,12 @@
       const yn = await this.askYesNo('Shall I proceed to sign you in?');
       if (yn !== 'yes'){ await this.say('Cancelled login.'); return; }
 
+      const usernameToSend = (username||'').replace(/[.,;!?]+$/,'').replace(/\s+/g,' ').trim();
       const attemptLogin = async (pwd) => {
         try{
           const res = await fetch('/auth/login', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: 'patient', username: username, password: pwd })
+            body: JSON.stringify({ role: 'patient', username: usernameToSend, password: pwd })
           });
           return await res.json();
         }catch(e){ return { success: false, message: 'network' }; }

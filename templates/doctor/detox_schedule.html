@@ -123,6 +123,41 @@
     <div class="row">
         <div class="col-12">
             <h4 class="mb-3">Daily Schedule (Editable)</h4>
+            {% if patient_reports %}
+            <div class="card mb-3">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0"><i class="fas fa-stream"></i> Patient Self-Reports</h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for r in patient_reports %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <div>
+                                    <span class="badge bg-primary">Day {{ r.day_number }}</span>
+                                    <small class="text-muted ms-2">{{ r.date }}</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <strong>Symptoms:</strong>
+                                    <div class="small {{ 'text-muted' if not r.symptoms }}">{{ r.symptoms or 'None reported' }}</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Side Effects:</strong>
+                                    <div class="small {{ 'text-muted' if not r.side_effects }}">{{ r.side_effects or 'None reported' }}</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Improvements:</strong>
+                                    <div class="small {{ 'text-muted' if not r.improvements }}">{{ r.improvements or 'None reported' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
             <div class="accordion" id="scheduleAccordion">
                 {% for day_key, day_data in appointment.schedule.daily_schedules.items() %}
                 <div class="accordion-item">

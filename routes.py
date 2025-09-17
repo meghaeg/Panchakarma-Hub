@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash, current_app
 from datetime import datetime, timedelta
-from models import Patient, Centre, Doctor, Appointment, DetoxAppointment, Feedback, Admin, ProgressTracking, Notification
+from models import Patient, Centre, Doctor, Appointment, DetoxAppointment, Feedback, Admin, ProgressTracking, Notification, ZoomMeeting
 from utils import *
 from email_service import *
 from sms_service import send_sms
@@ -30,6 +30,11 @@ def login():
             # Support username+password (voice mode) OR aadhar+password (existing)
             patient = Patient()
             username = (data.get('username') or '').strip()
+            # Normalize common voice/punctuation artifacts (e.g., trailing dots)
+            try:
+                cleaned_username = re.sub(r"[^A-Za-z0-9@\s]", "", username).strip()
+            except Exception:
+                cleaned_username = username
             user = None
             if username:
                 # Accept username as patient's name or email (case-insensitive, exact match)
@@ -46,6 +51,7 @@ def login():
                 elif is_inmem:
                     # Python-side case-insensitive exact match for name/email
                     uname = username.lower()
+                    cuname = cleaned_username.lower()
                     try:
                         candidates = patient.db.patients.find()
                     except Exception:
@@ -53,25 +59,33 @@ def login():
                     for doc in candidates:
                         email = str(doc.get('email', '')).lower()
                         name = str(doc.get('name', '')).lower()
-                        if email == uname or name == uname:
+                        if email == uname or name == uname or email == cuname or name == cuname:
                             user = doc
                             break
                 else:
                     def ci_exact(field, value):
                         pattern = f"^{re.escape(value)}$"
                         return patient.db.patients.find_one({field: {"$regex": pattern, "$options": "i"}})
-                    if '@' in username:
-                        user = ci_exact('email', username)
+                    if '@' in username or '@' in cleaned_username:
+                        # Try original then cleaned for email
+                        user = ci_exact('email', username) or ci_exact('email', cleaned_username)
                         if not user:
                             # Some users may say their name even if '@' present accidentally; fallback to name
-                            user = ci_exact('name', username)
+                            user = ci_exact('name', username) or ci_exact('name', cleaned_username)
                     else:
-                        user = ci_exact('name', username)
+                        user = ci_exact('name', username) or ci_exact('name', cleaned_username)
                     # As a fallback, allow partial, case-insensitive name contains if exact not found
                     if not user:
                         try:
                             user = patient.db.patients.find_one({
                                 'name': {"$regex": re.escape(username), "$options": "i"}
+                            })
+                        except Exception:
+                            user = None
+                    if not user and cleaned_username and cleaned_username != username:
+                        try:
+                            user = patient.db.patients.find_one({
+                                'name': {"$regex": re.escape(cleaned_username), "$options": "i"}
                             })
                         except Exception:
                             user = None
@@ -471,8 +485,142 @@ def dashboard():
     patient_id = session.get('user_id')
     appointment = Appointment()
     appointments = appointment.find_by_patient(patient_id)
+    # Provide centres for Zoom meeting modal
+    centre_model = Centre()
+    centres = centre_model.get_approved_centres()
     
-    return render_template('patient/dashboard.html', appointments=appointments)
+    return render_template('patient/dashboard.html', appointments=appointments, centres=centres)
+
+
+# Zoom Meeting Routes
+@patient_bp.route('/request-zoom', methods=['POST'])
+def request_zoom_meeting():
+    if 'user_id' not in session or session.get('role') != 'patient':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    try:
+        data = request.get_json() or {}
+        centre_id = data.get('centre_id')
+        slot = data.get('slot')  # e.g., '18:00', '18:15', ...
+        zm = ZoomMeeting()
+        res = zm.request(session.get('user_id'), centre_id, slot)
+
+        # Notify centre via email
+        centre = Centre()
+        centre_info = centre.find_by_id(centre_id)
+        patient = Patient()
+        patient_info = patient.find_by_id(session.get('user_id'))
+        if centre_info and patient_info:
+            from datetime import datetime
+            from email_service import send_zoom_request_to_centre
+            today_str = datetime.now().strftime('%Y-%m-%d')
+            send_zoom_request_to_centre(centre_info.get('email',''), centre_info.get('name','Centre'), patient_info.get('name','Patient'), today_str, slot)
+
+        return jsonify({'success': True, 'message': 'Zoom meeting requested. Await approval.', 'id': getattr(res, 'inserted_id', None)})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@patient_bp.route('/api/zoom-slots')
+def api_zoom_slots():
+    slots = ZoomMeeting.ALLOWED_SLOTS
+    return jsonify({'success': True, 'slots': slots})
+
+
+@centre_bp.route('/approve-zoom', methods=['POST'])
+def approve_zoom_meeting():
+    if 'user_id' not in session or session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    try:
+        data = request.get_json() or {}
+        zoom_meeting_id = data.get('zoom_meeting_id')
+        doctor_id = data.get('doctor_id')
+
+        # Build Zoom meeting at the selected slot today
+        zm = ZoomMeeting()
+        record = None
+        from datetime import datetime
+        db = get_db_connection()
+        record = db.zoom_meetings.find_one({'zoom_meeting_id': zoom_meeting_id})
+        if not record:
+            return jsonify({'success': False, 'message': 'Meeting not found'})
+
+        # Create Zoom meeting
+        from zoom_service import create_zoom_meeting, build_iso_time_for_today
+        start_time_iso = build_iso_time_for_today(record['slot'])
+        topic = f"Consultation - {record['date']} {record['slot']}"
+        zoom_payload = create_zoom_meeting(topic=topic, start_time_iso=start_time_iso, duration_minutes=15)
+
+        # Approve in DB with conflict check
+        result = zm.approve(zoom_meeting_id, session.get('user_id'), doctor_id, zoom_payload)
+
+        if getattr(result, 'modified_count', 0) > 0:
+            # Send emails
+            patient = Patient()
+            doctor = Doctor()
+            p = patient.find_by_id(record['patient_id'])
+            d = doctor.find_by_id(doctor_id)
+            from email_service import send_zoom_approval_emails
+            send_zoom_approval_emails(
+                p.get('email',''), p.get('name','Patient'),
+                d.get('email',''), d.get('name','Doctor'),
+                record['date'], record['slot'],
+                zoom_payload.get('join_url',''), zoom_payload.get('start_url','')
+            )
+
+            # Create dashboard notifications
+            notification = Notification()
+            try:
+                notification.create({
+                    'user_id': record['patient_id'],
+                    'user_type': 'patient',
+                    'title': '📹 Zoom Consultation Approved',
+                    'message': f"Your Zoom meeting at {record['slot']} is confirmed.",
+                    'type': 'appointment',
+                    'priority': 'high',
+                    'related_id': zoom_meeting_id
+                })
+                notification.create({
+                    'user_id': doctor_id,
+                    'user_type': 'doctor',
+                    'title': '📹 New Zoom Consultation',
+                    'message': f"Zoom meeting at {record['slot']} with a patient is scheduled.",
+                    'type': 'appointment',
+                    'priority': 'medium',
+                    'related_id': zoom_meeting_id
+                })
+            except Exception:
+                pass
+
+            return jsonify({'success': True, 'message': 'Zoom meeting approved and scheduled', 'zoom': zoom_payload})
+        else:
+            return jsonify({'success': False, 'message': 'Approval failed'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@centre_bp.route('/api/zoom-requests')
+def api_centre_zoom_requests():
+    if 'user_id' not in session or session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    zm = ZoomMeeting()
+    items = zm.find_for_centre_today(session.get('user_id'))
+    # populate patient name for display
+    pat = Patient()
+    serialized = []
+    for it in items:
+        p = pat.find_by_id(it.get('patient_id'))
+        clean = {
+            'zoom_meeting_id': it.get('zoom_meeting_id'),
+            'patient_id': it.get('patient_id'),
+            'patient_name': p.get('name', 'Patient') if p else 'Patient',
+            'centre_id': it.get('centre_id'),
+            'doctor_id': it.get('doctor_id'),
+            'date': str(it.get('date')),
+            'slot': it.get('slot'),
+            'status': it.get('status'),
+        }
+        serialized.append(clean)
+    return jsonify({'success': True, 'items': serialized})
 
 
 @patient_bp.route('/progress/<appointment_id>')
@@ -611,10 +759,22 @@ def detox_progress(detox_appointment_id):
     # Get progress data
     progress_tracking = ProgressTracking()
     progress_data = progress_tracking.get_daily_progress_summary(detox_appointment_id)
+
+    # Patient self-reports (symptoms/side effects/improvements)
+    try:
+        raw_reports = progress_tracking.find_by_detox_appointment(detox_appointment_id)
+        patient_reports = [r for r in raw_reports if r.get('update_type') == 'patient_report']
+        try:
+            patient_reports.sort(key=lambda x: (int(x.get('day_number') or 0), x.get('created_at')))
+        except Exception:
+            pass
+    except Exception:
+        patient_reports = []
     
     return render_template('patient/detox_progress.html', 
                          appointment=appointment, 
-                         progress_data=progress_data)
+                         progress_data=progress_data,
+                         patient_reports=patient_reports)
 
 
 @patient_bp.route('/api/detox-progress-data/<detox_appointment_id>')
@@ -1567,6 +1727,88 @@ def get_progress_data(appointment_id):
     
     return jsonify(progress_data)
 
+
+@patient_bp.route('/api/submit-patient-report', methods=['POST'])
+def submit_patient_report():
+    """Patients submit symptoms/side effects/improvements after a session"""
+    if session.get('role') != 'patient':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    try:
+        data = request.get_json() or {}
+        detox_appointment_id = data.get('detox_appointment_id')
+        day_number = data.get('day_number')
+        symptoms = (data.get('symptoms') or '').strip()
+        side_effects = (data.get('side_effects') or '').strip()
+        improvements = (data.get('improvements') or '').strip()
+
+        if not detox_appointment_id:
+            return jsonify({'success': False, 'message': 'Missing detox_appointment_id'}), 400
+
+        # Verify appointment belongs to patient
+        detox_appointment = DetoxAppointment()
+        appointment = detox_appointment.find_by_id(detox_appointment_id)
+        if not appointment or appointment.get('patient_id') != session.get('user_id'):
+            return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+
+        # Compute day_number if not provided: days since start_date (1-indexed), skipping Sundays
+        if not day_number:
+            try:
+                start_date = appointment['start_date']
+                if isinstance(start_date, str):
+                    start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                else:
+                    start_date_dt = start_date
+                today = datetime.now()
+                # Count working days excluding Sundays
+                d = start_date_dt
+                count = 0
+                while d.date() <= today.date():
+                    if d.strftime('%A').lower() != 'sunday':
+                        count += 1
+                    d += timedelta(days=1)
+                day_number = count
+            except Exception:
+                day_number = 1
+
+        entry = {
+            'detox_appointment_id': detox_appointment_id,
+            'patient_id': session.get('user_id'),
+            'doctor_id': appointment.get('doctor_id'),
+            'day_number': int(day_number),
+            'date': datetime.now().strftime('%Y-%m-%d'),
+            'update_type': 'patient_report',
+            'vitals': {},
+            'progress_score': None,
+            'notes': '',
+            'symptoms': symptoms,
+            'side_effects': side_effects,
+            'improvements': improvements
+        }
+
+        progress_tracking = ProgressTracking()
+        res = progress_tracking.create(entry)
+        if getattr(res, 'inserted_id', None):
+            # Notify doctor if assigned
+            try:
+                if appointment.get('doctor_id'):
+                    notification = Notification()
+                    notification.create({
+                        'user_id': appointment['doctor_id'],
+                        'user_type': 'doctor',
+                        'title': '📝 New Patient Report',
+                        'message': f"Patient submitted a report for Day {entry['day_number']}.",
+                        'type': 'detox',
+                        'priority': 'medium',
+                        'related_id': detox_appointment_id
+                    })
+            except Exception as ne:
+                print('Notification error (doctor patient report):', ne)
+            return jsonify({'success': True, 'message': 'Report submitted'})
+        return jsonify({'success': False, 'message': 'Failed to save report'}), 500
+    except Exception as e:
+        print('submit_patient_report error:', e)
+        return jsonify({'success': False, 'message': 'Server error'}), 500
+
 # Doctor Detox Therapy Routes
 @doctor_bp.route('/detox-dashboard')
 def detox_dashboard():
@@ -1593,7 +1835,20 @@ def view_detox_schedule_doctor(detox_appointment_id):
     if not appointment or appointment['doctor_id'] != session.get('user_id'):
         return redirect(url_for('doctor.detox_dashboard'))
     
-    return render_template('doctor/detox_schedule.html', appointment=appointment)
+    # Load patient self-reports for this detox appointment
+    reports = []
+    try:
+        progress_tracking = ProgressTracking()
+        entries = progress_tracking.find_by_detox_appointment(detox_appointment_id)
+        reports = [e for e in entries if e.get('update_type') == 'patient_report']
+        try:
+            reports.sort(key=lambda x: (int(x.get('day_number') or 0), x.get('created_at')))
+        except Exception:
+            pass
+    except Exception as e:
+        print('Error loading patient reports:', e)
+
+    return render_template('doctor/detox_schedule.html', appointment=appointment, patient_reports=reports)
 
 @doctor_bp.route('/update-detox-slot', methods=['POST'])
 def update_detox_slot():
@@ -1805,6 +2060,55 @@ def doctor_notifications():
                          unread_count=unread_count)
 
 
+@doctor_bp.route('/api/zoom-meetings')
+def api_doctor_zoom_meetings():
+    """Doctor's Zoom meetings for today with start links."""
+    if session.get('role') != 'doctor':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    zm = ZoomMeeting()
+    items = zm.find_for_doctor_today(session.get('user_id'))
+    # Keep only necessary fields
+    data = []
+    for it in items:
+        data.append({
+            'zoom_meeting_id': it.get('zoom_meeting_id'),
+            'slot': it.get('slot'),
+            'date': str(it.get('date')),
+            'patient_id': it.get('patient_id'),
+            'join_url': it.get('zoom', {}).get('join_url'),
+            'start_url': it.get('zoom', {}).get('start_url'),
+            'status': it.get('status')
+        })
+    return jsonify({'success': True, 'items': data})
+
+
+@doctor_bp.route('/end-zoom-meeting', methods=['POST'])
+def end_zoom_meeting_route():
+    if session.get('role') != 'doctor':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    try:
+        data = request.get_json() or {}
+        zm_id = data.get('zoom_meeting_id')
+        if not zm_id:
+            return jsonify({'success': False, 'message': 'zoom_meeting_id required'}), 400
+        db = get_db_connection()
+        meeting = db.zoom_meetings.find_one({'zoom_meeting_id': zm_id, 'doctor_id': session.get('user_id')})
+        if not meeting:
+            return jsonify({'success': False, 'message': 'Meeting not found'}), 404
+        # Try to end on Zoom
+        ok = False
+        try:
+            from zoom_service import end_zoom_meeting as zoom_end
+            ok = zoom_end(meeting.get('zoom', {}).get('id')) if meeting.get('zoom', {}).get('id') else False
+        except Exception:
+            ok = False
+        # Update status locally regardless, so patients can't join
+        db.zoom_meetings.update_one({'zoom_meeting_id': zm_id}, {'$set': {'status': 'ended', 'updated_at': datetime.now()}})
+        return jsonify({'success': True, 'ended_on_zoom': bool(ok)})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
 @centre_bp.route('/notifications')
 def centre_notifications():
     """Get centre notifications"""
@@ -1855,6 +2159,26 @@ def api_patient_notifications():
     except Exception as e:
         print(f"Error in api_patient_notifications: {str(e)}")
         return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@patient_bp.route('/api/zoom-meetings')
+def api_patient_zoom_meetings():
+    """Patient's Zoom meetings for today with join links (if approved)."""
+    if session.get('role') != 'patient':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    zm = ZoomMeeting()
+    items = zm.find_for_patient_today(session.get('user_id'))
+    data = []
+    for it in items:
+        data.append({
+            'zoom_meeting_id': it.get('zoom_meeting_id'),
+            'slot': it.get('slot'),
+            'date': str(it.get('date')),
+            'doctor_id': it.get('doctor_id'),
+            'join_url': it.get('zoom', {}).get('join_url') if it.get('status') == 'approved' else None,
+            'status': it.get('status')
+        })
+    return jsonify({'success': True, 'items': data})
 
 
 @doctor_bp.route('/api/notifications')

@@ -138,6 +138,94 @@
             </div>
         </div>
     </div>
+    
+    <!-- Patient Self-Report Form -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="mb-0"><i class="fas fa-notes-medical"></i> Report Symptoms / Side Effects / Improvements</h5>
+                </div>
+                <div class="card-body">
+                    <form id="patientReportForm">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="reportDay" class="form-label">Day Number (optional)</label>
+                                <input type="number" class="form-control" id="reportDay" min="1" placeholder="Auto-calculated if left empty">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="symptoms" class="form-label">Symptoms</label>
+                            <textarea class="form-control" id="symptoms" rows="2" placeholder="Describe any symptoms"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sideEffects" class="form-label">Side Effects</label>
+                            <textarea class="form-control" id="sideEffects" rows="2" placeholder="Describe any side effects"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="improvements" class="form-label">Improvements</label>
+                            <textarea class="form-control" id="improvements" rows="2" placeholder="Describe improvements noticed"></textarea>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-paper-plane"></i> Submit Report
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Patient Self-Reports List -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-stream"></i> Your Reports</h5>
+                </div>
+                <div class="card-body">
+                    {% if patient_reports and patient_reports|length > 0 %}
+                        <div class="list-group">
+                            {% for r in patient_reports %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <div>
+                                        <span class="badge bg-primary">Day {{ r.day_number }}</span>
+                                        <small class="text-muted ms-2">{{ r.date }}</small>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    {% if r.symptoms %}
+                                    <div class="col-md-4">
+                                        <strong>Symptoms:</strong>
+                                        <div>{{ r.symptoms }}</div>
+                                    </div>
+                                    {% endif %}
+                                    {% if r.side_effects %}
+                                    <div class="col-md-4">
+                                        <strong>Side Effects:</strong>
+                                        <div>{{ r.side_effects }}</div>
+                                    </div>
+                                    {% endif %}
+                                    {% if r.improvements %}
+                                    <div class="col-md-4">
+                                        <strong>Improvements:</strong>
+                                        <div>{{ r.improvements }}</div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-muted">No reports submitted yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <!-- Chart.js CDN -->
@@ -147,6 +235,7 @@
 // Load progress data and create charts
 document.addEventListener('DOMContentLoaded', function() {
     const detoxAppointmentId = '{{ appointment.detox_appointment_id }}';
+    const reportForm = document.getElementById('patientReportForm');
     
     fetch(`/patient/api/detox-progress-data/${detoxAppointmentId}`)
         .then(response => response.json())
@@ -161,6 +250,44 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Error loading progress data:', error);
         });
+    
+    // Handle report submission
+    if (reportForm) {
+        reportForm.addEventListener('submit', async function(e){
+            e.preventDefault();
+            const submitBtn = reportForm.querySelector('button[type="submit"]');
+            const original = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+            try{
+                const payload = {
+                    detox_appointment_id: detoxAppointmentId,
+                    day_number: document.getElementById('reportDay').value || null,
+                    symptoms: document.getElementById('symptoms').value,
+                    side_effects: document.getElementById('sideEffects').value,
+                    improvements: document.getElementById('improvements').value
+                };
+                const res = await fetch('/patient/api/submit-patient-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success){
+                    alert('Report submitted successfully');
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Failed to submit report');
+                }
+            } catch(err){
+                console.error('Submit report error:', err);
+                alert('Network error while submitting report');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = original;
+            }
+        });
+    }
 });
 
 function createProgressChart(data) {

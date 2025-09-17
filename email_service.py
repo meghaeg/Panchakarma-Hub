@@ -633,3 +633,60 @@ def send_doctor_assignment_notification(doctor_email, doctor_name, appointment_d
     Panchakarma Therapy Management Portal
     """
     return send_email(doctor_email, subject, body)
+
+
+def send_zoom_request_to_centre(centre_email, centre_name, patient_name, date_str, slot):
+    subject = "New Zoom Meeting Request - Approval Required"
+    body = f"""
+    Dear {centre_name},
+    
+    A patient has requested a Zoom tele-consultation for today.
+    
+    Details:
+    - Patient: {patient_name}
+    - Date: {date_str}
+    - Slot: {slot}
+    
+    Please approve in your dashboard and assign a doctor.
+    
+    Best regards,
+    Panchakarma Portal
+    """
+    return send_email(centre_email, subject, body)
+
+
+def send_zoom_approval_emails(patient_email, patient_name, doctor_email, doctor_name, date_str, slot, join_url, start_url):
+    # Patient email
+    p_subject = "Your Zoom Consultation is Scheduled"
+    p_body = f"""
+    Dear {patient_name},
+    
+    Your Zoom consultation has been scheduled.
+    
+    - Date: {date_str}
+    - Time: {slot}
+    - Doctor: Dr. {doctor_name}
+    - Join Link: {join_url}
+    
+    Please join a few minutes early.
+    
+    Best regards,
+    Panchakarma Portal
+    """
+    send_email(patient_email, p_subject, p_body)
+
+    # Doctor email
+    d_subject = "Zoom Consultation Assigned"
+    d_body = f"""
+    Dear Dr. {doctor_name},
+    
+    A Zoom consultation has been assigned to you.
+    
+    - Patient: {patient_name}
+    - Date: {date_str}
+    - Time: {slot}
+    - Start URL: {start_url}
+    
+    Please start the meeting at the scheduled time.
+    """
+    return send_email(doctor_email, d_subject, d_body)

@@ -684,6 +684,13 @@ class ProgressTracking:
             'created_at': datetime.now(),
             'updated_at': datetime.now()
         }
+        # Include optional patient self-report fields when present
+        if 'symptoms' in data:
+            progress_data['symptoms'] = data.get('symptoms', '')
+        if 'side_effects' in data:
+            progress_data['side_effects'] = data.get('side_effects', '')
+        if 'improvements' in data:
+            progress_data['improvements'] = data.get('improvements', '')
         return self.db.progress_tracking.insert_one(progress_data)
     
     def find_by_detox_appointment(self, detox_appointment_id):
@@ -845,3 +852,96 @@ class Notification:
         if notifications:
             return self.db.notifications.insert_many(notifications)
         return None
+
+
+class ZoomMeeting:
+    """Model for Zoom tele-consultations between patients and doctors."""
+    ALLOWED_SLOTS = [
+        '18:00', '18:15', '18:30', '18:45',
+        '19:00', '19:15', '19:30', '19:45'
+    ]
+
+    def __init__(self):
+        self.db = get_db_connection()
+
+    def _day_range(self, date_obj):
+        from datetime import datetime
+        start = datetime.combine(date_obj, datetime.min.time())
+        end = datetime.combine(date_obj, datetime.max.time())
+        return start, end
+
+    def request(self, patient_id, centre_id, slot):
+        """Create a meeting request for today for a specific slot.
+        Status flow: requested -> approved -> completed/cancelled
+        Doctor is assigned by centre on approval.
+        """
+        from datetime import datetime
+        if slot not in self.ALLOWED_SLOTS:
+            raise ValueError('Invalid slot; allowed: 18:00 to 19:45 every 15 minutes')
+        today = datetime.now().date()
+        existing = self.db.zoom_meetings.find_one({
+            'patient_id': patient_id,
+            'centre_id': centre_id,
+            'date': today.strftime('%Y-%m-%d'),
+            'slot': slot,
+            'status': {'$in': ['requested', 'approved']}
+        })
+        if existing:
+            raise ValueError('You already have a meeting request for this slot')
+
+        meeting = {
+            'zoom_meeting_id': f"ZMT{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            'patient_id': patient_id,
+            'centre_id': centre_id,
+            'doctor_id': None,
+            'date': today.strftime('%Y-%m-%d'),
+            'slot': slot,
+            'status': 'requested',
+            'created_at': datetime.now(),
+            'updated_at': datetime.now(),
+            'zoom': {}
+        }
+        return self.db.zoom_meetings.insert_one(meeting)
+
+    def approve(self, zoom_meeting_id, centre_id, doctor_id, zoom_payload):
+        """Approve and assign doctor if no conflict. `zoom_payload` includes join/start urls."""
+        from datetime import datetime
+        meeting = self.db.zoom_meetings.find_one({'zoom_meeting_id': zoom_meeting_id, 'centre_id': centre_id})
+        if not meeting:
+            raise ValueError('Meeting not found')
+
+        # Prevent double-booking for doctor
+        conflict = self.db.zoom_meetings.find_one({
+            'doctor_id': doctor_id,
+            'date': meeting['date'],
+            'slot': meeting['slot'],
+            'status': {'$in': ['approved']}
+        })
+        if conflict:
+            raise ValueError('Doctor already has a meeting at this slot')
+
+        update = {
+            'doctor_id': doctor_id,
+            'status': 'approved',
+            'updated_at': datetime.now(),
+            'zoom': zoom_payload
+        }
+        return self.db.zoom_meetings.update_one(
+            {'zoom_meeting_id': zoom_meeting_id},
+            {'$set': update}
+        )
+
+    def find_for_doctor_today(self, doctor_id):
+        from datetime import datetime
+        today = datetime.now().date().strftime('%Y-%m-%d')
+        return list(self.db.zoom_meetings.find({'doctor_id': doctor_id, 'date': today, 'status': 'approved'}))
+
+    def find_for_centre_today(self, centre_id):
+        from datetime import datetime
+        today = datetime.now().date().strftime('%Y-%m-%d')
+        return list(self.db.zoom_meetings.find({'centre_id': centre_id, 'date': today}))
+
+    def find_for_patient_today(self, patient_id):
+        from datetime import datetime
+        today = datetime.now().date().strftime('%Y-%m-%d')
+        return list(self.db.zoom_meetings.find({'patient_id': patient_id, 'date': today}))

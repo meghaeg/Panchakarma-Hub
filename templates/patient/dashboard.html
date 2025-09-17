@@ -4,222 +4,354 @@
 
 {% block content %}
 <div class="container py-4">
-    <!-- Welcome Section -->
-    <div class="row mb-4">
+	<!-- Welcome Section -->
+	<div class="row mb-4">
+		<div class="col-12">
+			<div class="card dashboard-card">
+				<div class="card-body">
+					<div class="row align-items-center">
+						<div class="col-md-8">
+							<h4 class="mb-1">Welcome back, {{ session.name }}!</h4>
+							<p class="text-muted mb-0">Track your Panchakarma therapy journey and manage appointments</p>
+						</div>
+						<div class="col-md-4 text-end">
+							<a href="{{ url_for('patient.book_appointment') }}" class="btn btn-primary">
+								<i class="fas fa-calendar-plus"></i> Book New Appointment
+							</a>
+							<button class="btn btn-outline-info ms-2" data-bs-toggle="modal" data-bs-target="#zoomModal">
+								<i class="fas fa-video"></i> Book Zoom Meeting
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Quick Stats -->
+	<div class="row mb-4">
+		<div class="col-md-3">
+			<div class="card text-center">
+				<div class="card-body">
+					<i class="fas fa-calendar-check text-primary" style="font-size: 2rem;"></i>
+					<h5 class="mt-2">{{ appointments|selectattr('status', 'equalto', 'completed')|list|length }}</h5>
+					<p class="text-muted mb-0">Completed</p>
+				</div>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="card text-center">
+				<div class="card-body">
+					<i class="fas fa-clock text-warning" style="font-size: 2rem;"></i>
+					<h5 class="mt-2">{{ appointments|selectattr('status', 'equalto', 'confirmed')|list|length }}</h5>
+					<p class="text-muted mb-0">Upcoming</p>
+				</div>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="card text-center">
+				<div class="card-body">
+					<i class="fas fa-play-circle text-success" style="font-size: 2rem;"></i>
+					<h5 class="mt-2">{{ appointments|selectattr('status', 'equalto', 'in_progress')|list|length }}</h5>
+					<p class="text-muted mb-0">In Progress</p>
+				</div>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="card text-center">
+				<div class="card-body">
+					<i class="fas fa-star text-secondary" style="font-size: 2rem;"></i>
+					<h5 class="mt-2">{{ appointments|length }}</h5>
+					<p class="text-muted mb-0">Total Sessions</p>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Recent Appointments -->
+	<div class="row">
+		<div class="col-lg-8">
+			<div class="card">
+				<div class="card-header">
+					<h5 class="mb-0"><i class="fas fa-calendar-alt"></i> My Appointments</h5>
+				</div>
+				<div class="card-body">
+					{% if appointments %}
+						<div class="table-responsive">
+							<table class="table table-hover">
+								<thead>
+									<tr>
+										<th>Date</th>
+										<th>Time Slot</th>
+										<th>Centre</th>
+										<th>Therapy</th>
+										<th>Doctor</th>
+										<th>Status</th>
+										<th>Actions</th>
+									</tr>
+								</thead>
+								<tbody>
+									{% for appointment in appointments[:5] %}
+									<tr>
+										<td>{{ appointment.appointment_date if appointment.appointment_date else 'N/A' }}</td>
+										<td>
+											{% if appointment.time_slot %}
+												<span class="badge bg-info">{{ appointment.time_slot }}</span>
+											{% else %}
+												<span class="text-muted">Not assigned</span>
+											{% endif %}
+										</td>
+										<td>
+											<div>
+												<strong>{{ appointment.centre_name or 'N/A' }}</strong>
+												{% if appointment.centre_email %}
+												<br><small class="text-info"><i class="fas fa-envelope"></i> {{ appointment.centre_email }}</small>
+												{% endif %}
+												{% if appointment.centre_phone %}
+												<br><small class="text-success"><i class="fas fa-phone"></i> {{ appointment.centre_phone }}</small>
+												{% endif %}
+											</div>
+										</td>
+										<td>{{ appointment.therapy_type }}</td>
+										<td>
+											<div>
+												<strong>{{ appointment.doctor_name or 'Not assigned' }}</strong>
+												{% if appointment.doctor_email %}
+												<br><small class="text-info"><i class="fas fa-envelope"></i> {{ appointment.doctor_email }}</small>
+												{% endif %}
+												{% if appointment.doctor_phone %}
+												<br><small class="text-success"><i class="fas fa-phone"></i> {{ appointment.doctor_phone }}</small>
+												{% endif %}
+											</div>
+										</td>
+										<td>
+											<span class="status-badge status-{{ appointment.status }}">
+												{{ appointment.status.title() }}
+											</span>
+										</td>
+										<td>
+											{% if appointment.status == 'completed' %}
+												<a href="{{ url_for('patient.view_progress', appointment_id=appointment.appointment_id) }}" 
+												   class="btn btn-sm btn-outline-primary">
+													<i class="fas fa-chart-line"></i> View Progress
+												</a>
+											{% elif appointment.status in ['confirmed', 'in_progress'] %}
+												<a href="{{ url_for('patient.view_progress', appointment_id=appointment.appointment_id) }}" 
+												   class="btn btn-sm btn-outline-success">
+													<i class="fas fa-eye"></i> Track
+												</a>
+											{% endif %}
+										</td>
+									</tr>
+									{% endfor %}
+								</tbody>
+							</table>
+						</div>
+					{% else %}
+						<div class="text-center py-4">
+							<i class="fas fa-calendar-times text-muted" style="font-size: 3rem;"></i>
+							<h5 class="mt-3 text-muted">No appointments yet</h5>
+							<p class="text-muted">Book your first Panchakarma therapy session</p>
+							<a href="{{ url_for('patient.book_appointment') }}" class="btn btn-primary">
+								<i class="fas fa-calendar-plus"></i> Book Appointment
+							</a>
+						</div>
+					{% endif %}
+				</div>
+			</div>
+		</div>
+
+		<!-- Quick Actions -->
+		<div class="col-lg-4">
+			<div class="card">
+				<div class="card-header">
+					<h5 class="mb-0"><i class="fas fa-bolt"></i> Quick Actions</h5>
+				</div>
+				<div class="card-body">
+					<div class="d-grid gap-2">
+						<a href="{{ url_for('patient.book_appointment') }}" class="btn btn-primary">
+							<i class="fas fa-calendar-plus"></i> Book New Appointment
+						</a>
+						<a href="{{ url_for('patient.book_detox') }}" class="btn btn-success">
+							<i class="fas fa-heartbeat"></i> Book Detox Therapy
+						</a>
+						<a href="{{ url_for('patient.detox_dashboard') }}" class="btn btn-outline-success">
+							<i class="fas fa-calendar-check"></i> Detox Dashboard
+						</a>
+						<a href="{{ url_for('patient.submit_feedback') }}" class="btn btn-outline-secondary">
+							<i class="fas fa-comment"></i> Submit Feedback
+						</a>
+						<button class="btn btn-outline-info" onclick="downloadMedicalHistory()">
+							<i class="fas fa-download"></i> Download Medical History
+						</button>
+						<button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#zoomModal">
+							<i class="fas fa-video"></i> Book Zoom Meeting
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Health Tips -->
+			<div class="card mt-3">
+				<div class="card-header">
+					<h5 class="mb-0"><i class="fas fa-lightbulb"></i> Ayurvedic Tips</h5>
+				</div>
+				<div class="card-body">
+					<div class="mb-3">
+						<h6 class="text-primary">Daily Routine (Dinacharya)</h6>
+						<p class="small mb-2">Wake up before sunrise for optimal health</p>
+					</div>
+					<div class="mb-3">
+						<h6 class="text-primary">Balanced Diet</h6>
+						<p class="small mb-2">Eat according to your dosha constitution</p>
+					</div>
+					<div class="mb-0">
+						<h6 class="text-primary">Meditation</h6>
+						<p class="small mb-0">Practice daily meditation for mental clarity</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Zoom Booking Modal -->
+	<div class="modal fade" id="zoomModal" tabindex="-1" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">Book Zoom Meeting (Today 6–8 PM)</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<div class="mb-3">
+						<label class="form-label">Centre</label>
+						<select id="zoomCentre" class="form-select">
+							{% for c in centres or [] %}
+							<option value="{{ c.centre_id }}">{{ c.name }}</option>
+							{% endfor %}
+						</select>
+					</div>
+					<div class="mb-3">
+						<label class="form-label">Time Slot</label>
+						<select id="zoomSlot" class="form-select"></select>
+						<small class="text-muted">Available slots: 18:00, 18:15, 18:30, 18:45, 19:00, 19:15, 19:30, 19:45</small>
+					</div>
+					<div id="zoomMsg" class="text-danger small"></div>
+				</div>
+				<div class="modal-footer">
+					<button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+					<button class="btn btn-primary" onclick="submitZoom()">Request Meeting</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+    <!-- Today's Zoom Meetings -->
+    <div class="row mt-4">
         <div class="col-12">
-            <div class="card dashboard-card">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <h4 class="mb-1">Welcome back, {{ session.name }}!</h4>
-                            <p class="text-muted mb-0">Track your Panchakarma therapy journey and manage appointments</p>
-                        </div>
-                        <div class="col-md-4 text-end">
-                            <a href="{{ url_for('patient.book_appointment') }}" class="btn btn-primary">
-                                <i class="fas fa-calendar-plus"></i> Book New Appointment
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Stats -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <i class="fas fa-calendar-check text-primary" style="font-size: 2rem;"></i>
-                    <h5 class="mt-2">{{ appointments|selectattr('status', 'equalto', 'completed')|list|length }}</h5>
-                    <p class="text-muted mb-0">Completed</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <i class="fas fa-clock text-warning" style="font-size: 2rem;"></i>
-                    <h5 class="mt-2">{{ appointments|selectattr('status', 'equalto', 'confirmed')|list|length }}</h5>
-                    <p class="text-muted mb-0">Upcoming</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <i class="fas fa-play-circle text-success" style="font-size: 2rem;"></i>
-                    <h5 class="mt-2">{{ appointments|selectattr('status', 'equalto', 'in_progress')|list|length }}</h5>
-                    <p class="text-muted mb-0">In Progress</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <i class="fas fa-star text-secondary" style="font-size: 2rem;"></i>
-                    <h5 class="mt-2">{{ appointments|length }}</h5>
-                    <p class="text-muted mb-0">Total Sessions</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Appointments -->
-    <div class="row">
-        <div class="col-lg-8">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-calendar-alt"></i> My Appointments</h5>
+                    <h5 class="mb-0"><i class="fas fa-video"></i> Your Zoom Meetings (Today)</h5>
                 </div>
                 <div class="card-body">
-                    {% if appointments %}
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Time Slot</th>
-                                        <th>Centre</th>
-                                        <th>Therapy</th>
-                                        <th>Doctor</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for appointment in appointments[:5] %}
-                                    <tr>
-                                        <td>{{ appointment.appointment_date if appointment.appointment_date else 'N/A' }}</td>
-                                        <td>
-                                            {% if appointment.time_slot %}
-                                                <span class="badge bg-info">{{ appointment.time_slot }}</span>
-                                            {% else %}
-                                                <span class="text-muted">Not assigned</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <div>
-                                                <strong>{{ appointment.centre_name or 'N/A' }}</strong>
-                                                {% if appointment.centre_email %}
-                                                <br><small class="text-info"><i class="fas fa-envelope"></i> {{ appointment.centre_email }}</small>
-                                                {% endif %}
-                                                {% if appointment.centre_phone %}
-                                                <br><small class="text-success"><i class="fas fa-phone"></i> {{ appointment.centre_phone }}</small>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        <td>{{ appointment.therapy_type }}</td>
-                                        <td>
-                                            <div>
-                                                <strong>{{ appointment.doctor_name or 'Not assigned' }}</strong>
-                                                {% if appointment.doctor_email %}
-                                                <br><small class="text-info"><i class="fas fa-envelope"></i> {{ appointment.doctor_email }}</small>
-                                                {% endif %}
-                                                {% if appointment.doctor_phone %}
-                                                <br><small class="text-success"><i class="fas fa-phone"></i> {{ appointment.doctor_phone }}</small>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="status-badge status-{{ appointment.status }}">
-                                                {{ appointment.status.title() }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {% if appointment.status == 'completed' %}
-                                                <a href="{{ url_for('patient.view_progress', appointment_id=appointment.appointment_id) }}" 
-                                                   class="btn btn-sm btn-outline-primary">
-                                                    <i class="fas fa-chart-line"></i> View Progress
-                                                </a>
-                                            {% elif appointment.status in ['confirmed', 'in_progress'] %}
-                                                <a href="{{ url_for('patient.view_progress', appointment_id=appointment.appointment_id) }}" 
-                                                   class="btn btn-sm btn-outline-success">
-                                                    <i class="fas fa-eye"></i> Track
-                                                </a>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-4">
-                            <i class="fas fa-calendar-times text-muted" style="font-size: 3rem;"></i>
-                            <h5 class="mt-3 text-muted">No appointments yet</h5>
-                            <p class="text-muted">Book your first Panchakarma therapy session</p>
-                            <a href="{{ url_for('patient.book_appointment') }}" class="btn btn-primary">
-                                <i class="fas fa-calendar-plus"></i> Book Appointment
-                            </a>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="col-lg-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-bolt"></i> Quick Actions</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="{{ url_for('patient.book_appointment') }}" class="btn btn-primary">
-                            <i class="fas fa-calendar-plus"></i> Book New Appointment
-                        </a>
-                        <a href="{{ url_for('patient.book_detox') }}" class="btn btn-success">
-                            <i class="fas fa-heartbeat"></i> Book Detox Therapy
-                        </a>
-                        <a href="{{ url_for('patient.detox_dashboard') }}" class="btn btn-outline-success">
-                            <i class="fas fa-calendar-check"></i> Detox Dashboard
-                        </a>
-                        <a href="{{ url_for('patient.submit_feedback') }}" class="btn btn-outline-secondary">
-                            <i class="fas fa-comment"></i> Submit Feedback
-                        </a>
-                        <button class="btn btn-outline-info" onclick="downloadMedicalHistory()">
-                            <i class="fas fa-download"></i> Download Medical History
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Health Tips -->
-            <div class="card mt-3">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-lightbulb"></i> Ayurvedic Tips</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <h6 class="text-primary">Daily Routine (Dinacharya)</h6>
-                        <p class="small mb-2">Wake up before sunrise for optimal health</p>
-                    </div>
-                    <div class="mb-3">
-                        <h6 class="text-primary">Balanced Diet</h6>
-                        <p class="small mb-2">Eat according to your dosha constitution</p>
-                    </div>
-                    <div class="mb-0">
-                        <h6 class="text-primary">Meditation</h6>
-                        <p class="small mb-0">Practice daily meditation for mental clarity</p>
-                    </div>
+                    <div id="patientZoomList" class="small text-muted">Loading…</div>
                 </div>
             </div>
         </div>
     </div>
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 function downloadMedicalHistory() {
-    // This would generate and download a PDF of medical history
-    alert('Medical history download will be implemented with PDF generation');
+	// This would generate and download a PDF of medical history
+	alert('Medical history download will be implemented with PDF generation');
+}
+
+// Load slots on modal open
+const zoomModal = document.getElementById('zoomModal');
+if (zoomModal) {
+	zoomModal.addEventListener('show.bs.modal', async () => {
+		try {
+			const r = await fetch('/patient/api/zoom-slots');
+			const data = await r.json();
+			const sel = document.getElementById('zoomSlot');
+			sel.innerHTML = '';
+			(data.slots || []).forEach(s => {
+				const o = document.createElement('option');
+				o.value = s; o.textContent = s;
+				sel.appendChild(o);
+			});
+		} catch(e) {}
+	});
+}
+
+async function submitZoom() {
+    const centre = document.getElementById('zoomCentre').value;
+	const slot = document.getElementById('zoomSlot').value;
+	const msg = document.getElementById('zoomMsg');
+	msg.textContent = '';
+    if (!centre) {
+        msg.textContent = 'Please select a centre';
+        return;
+    }
+    if (!slot) {
+        msg.textContent = 'Please select a time slot';
+        return;
+    }
+	try {
+		const res = await fetch('/patient/request-zoom', {
+			method: 'POST', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ centre_id: centre, slot: slot })
+		});
+		const data = await res.json();
+		if (data.success) {
+			msg.classList.remove('text-danger');
+			msg.classList.add('text-success');
+			msg.textContent = 'Request submitted. Await centre approval.';
+		} else {
+			msg.classList.remove('text-success');
+			msg.classList.add('text-danger');
+			msg.textContent = data.message || 'Failed to submit request';
+		}
+	} catch (e) {
+		msg.textContent = 'Network error';
+	}
 }
 
 // Auto-refresh dashboard every 5 minutes
 setInterval(function() {
-    location.reload();
+	location.reload();
 }, 300000);
+
+// Load patient Zoom meetings
+(async function loadPatientZoom(){
+    try {
+        const res = await fetch('/patient/api/zoom-meetings');
+        const data = await res.json();
+        const box = document.getElementById('patientZoomList');
+        if (!box) return;
+        if (!data.success || !data.items || data.items.length === 0) {
+            box.textContent = 'No Zoom meetings today.';
+            return;
+        }
+        box.innerHTML = '';
+        data.items.forEach(it => {
+            const line = document.createElement('div');
+            line.className = 'mb-2';
+            let stateHtml = '<span class="text-warning">Awaiting centre approval…</span>';
+            if (it.status === 'ended') stateHtml = '<span class="text-danger">Ended</span>';
+            else if (it.join_url) stateHtml = `<a class=\"btn btn-sm btn-success\" target=\"_blank\" href=\"${it.join_url}\">Join</a>`;
+            const join = stateHtml;
+            line.innerHTML = `<strong>${it.slot}</strong> ${join}`;
+            box.appendChild(line);
+        });
+    } catch(e) {
+        const box = document.getElementById('patientZoomList');
+        if (box) box.textContent = 'Failed to load.';
+    }
+})();
 </script>
 {% endblock %}

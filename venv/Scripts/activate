@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="E:\Panchakarma-Hub\venv"
+VIRTUAL_ENV="C:\Users\renus\OneDrive\Documents\GitHub\Panchakarma-Hub\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

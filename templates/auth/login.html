@@ -38,10 +38,10 @@
                     <form id="loginForm">
                         <div id="patientFields">
                             <div class="mb-3">
-                                <label for="aadhar" class="form-label">
-                                    <i class="fas fa-id-card"></i> Aadhar Number
+                                <label for="username" class="form-label">
+                                    <i class="fas fa-user"></i> Username
                                 </label>
-                                <input type="text" class="form-control" id="aadhar" placeholder="Enter 12-digit Aadhar number" maxlength="12">
+                                <input type="text" class="form-control" id="username" placeholder="Enter username">
                             </div>
                         </div>
                         
@@ -134,14 +134,14 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         if (role === 'patient') {
-            const aadhar = document.getElementById('aadhar').value;
-            if (!aadhar || aadhar.length !== 12) {
-                alert('Please enter valid 12-digit Aadhar number');
+            const username = document.getElementById('username').value.trim();
+            if (!username) {
+                alert('Please enter your username');
                 submitButton.innerHTML = originalText;
                 submitButton.disabled = false;
                 return;
             }
-            loginData.aadhar = aadhar;
+            loginData.username = username;
         } else {
             const email = document.getElementById('email').value;
             if (!email || !email.includes('@')) {
