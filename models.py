@@ -854,6 +854,171 @@ class Notification:
         return None
 
 
+class Bed:
+    """Model for bed management in centres"""
+    
+    def __init__(self):
+        self.db = get_db_connection()
+    
+    def create(self, data):
+        """Create new bed"""
+        bed_data = {
+            'bed_id': data['bed_id'],
+            'centre_id': data['centre_id'],
+            'bed_type': data['bed_type'],  # 'general_ward', 'special_room', 'panchakarma_therapy'
+            'room_number': data['room_number'],
+            'location': data.get('location', ''),
+            'status': 'available',  # 'available', 'occupied', 'under_cleaning', 'reserved'
+            'price_per_day': data.get('price_per_day', 0),
+            'features': data.get('features', []),  # ['ac', 'tv', 'private_bathroom', etc.]
+            'current_patient_id': None,
+            'current_patient_name': None,
+            'check_in_date': None,
+            'check_out_date': None,
+            'created_at': datetime.now(),
+            'updated_at': datetime.now()
+        }
+        return self.db.beds.insert_one(bed_data)
+    
+    def find_by_id(self, bed_id):
+        """Find bed by ID"""
+        return self.db.beds.find_one({'bed_id': bed_id})
+    
+    def find_by_centre(self, centre_id, status=None):
+        """Find all beds for a centre"""
+        query = {'centre_id': centre_id}
+        if status:
+            query['status'] = status
+        return list(self.db.beds.find(query).sort([('room_number', ASCENDING), ('bed_id', ASCENDING)]))
+    
+    def find_available_beds(self, centre_id, bed_type=None):
+        """Find available beds for allocation"""
+        query = {
+            'centre_id': centre_id,
+            'status': 'available'
+        }
+        if bed_type:
+            query['bed_type'] = bed_type
+        return list(self.db.beds.find(query).sort([('room_number', ASCENDING), ('bed_id', ASCENDING)]))
+    
+    def allocate_bed(self, bed_id, patient_id, patient_name, check_in_date=None):
+        """Allocate bed to patient"""
+        if not check_in_date:
+            check_in_date = datetime.now()
+        
+        return self.db.beds.update_one(
+            {'bed_id': bed_id, 'status': 'available'},
+            {'$set': {
+                'status': 'occupied',
+                'current_patient_id': patient_id,
+                'current_patient_name': patient_name,
+                'check_in_date': check_in_date,
+                'updated_at': datetime.now()
+            }}
+        )
+    
+    def checkout_bed(self, bed_id, check_out_date=None):
+        """Checkout patient and mark bed for cleaning"""
+        if not check_out_date:
+            check_out_date = datetime.now()
+        
+        return self.db.beds.update_one(
+            {'bed_id': bed_id},
+            {'$set': {
+                'status': 'under_cleaning',
+                'check_out_date': check_out_date,
+                'updated_at': datetime.now()
+            }}
+        )
+    
+    def mark_available(self, bed_id):
+        """Mark bed as available after cleaning"""
+        return self.db.beds.update_one(
+            {'bed_id': bed_id},
+            {'$set': {
+                'status': 'available',
+                'current_patient_id': None,
+                'current_patient_name': None,
+                'check_in_date': None,
+                'check_out_date': None,
+                'updated_at': datetime.now()
+            }}
+        )
+    
+    def reserve_bed(self, bed_id, patient_id, patient_name):
+        """Reserve bed for patient"""
+        return self.db.beds.update_one(
+            {'bed_id': bed_id, 'status': 'available'},
+            {'$set': {
+                'status': 'reserved',
+                'current_patient_id': patient_id,
+                'current_patient_name': patient_name,
+                'updated_at': datetime.now()
+            }}
+        )
+    
+    def cancel_reservation(self, bed_id):
+        """Cancel bed reservation"""
+        return self.db.beds.update_one(
+            {'bed_id': bed_id, 'status': 'reserved'},
+            {'$set': {
+                'status': 'available',
+                'current_patient_id': None,
+                'current_patient_name': None,
+                'updated_at': datetime.now()
+            }}
+        )
+    
+    def get_bed_statistics(self, centre_id):
+        """Get bed occupancy statistics"""
+        beds = self.find_by_centre(centre_id)
+        stats = {
+            'total': len(beds),
+            'available': 0,
+            'occupied': 0,
+            'under_cleaning': 0,
+            'reserved': 0,
+            'by_type': {}
+        }
+        
+        for bed in beds:
+            status = bed['status']
+            bed_type = bed['bed_type']
+            
+            if status in stats:
+                stats[status] += 1
+            
+            if bed_type not in stats['by_type']:
+                stats['by_type'][bed_type] = {
+                    'total': 0,
+                    'available': 0,
+                    'occupied': 0,
+                    'under_cleaning': 0,
+                    'reserved': 0
+                }
+            
+            stats['by_type'][bed_type]['total'] += 1
+            stats['by_type'][bed_type][status] += 1
+        
+        return stats
+    
+    def search_beds(self, centre_id, filters=None):
+        """Search beds with filters"""
+        query = {'centre_id': centre_id}
+        
+        if filters:
+            if filters.get('bed_type'):
+                query['bed_type'] = filters['bed_type']
+            if filters.get('status'):
+                query['status'] = filters['status']
+            if filters.get('room_number'):
+                query['room_number'] = {'$regex': filters['room_number'], '$options': 'i'}
+            if filters.get('patient_name'):
+                query['current_patient_name'] = {'$regex': filters['patient_name'], '$options': 'i'}
+        
+        return list(self.db.beds.find(query).sort([('room_number', ASCENDING), ('bed_id', ASCENDING)]))
+
+
 class ZoomMeeting:
     """Model for Zoom tele-consultations between patients and doctors."""
     ALLOWED_SLOTS = [

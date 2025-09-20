@@ -1,0 +1,22 @@
+{
+  "name": "panchakarma-alexa-lambda",
+  "version": "1.0.0",
+  "description": "AWS Lambda function for Panchakarma Manager Alexa Skill",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "mongodb": "^6.0.0",
+    "uuid": "^9.0.0"
+  },
+  "keywords": [
+    "alexa",
+    "lambda",
+    "panchakarma",
+    "healthcare",
+    "mongodb"
+  ],
+  "author": "Panchakarma Management System",
+  "license": "MIT"
+}

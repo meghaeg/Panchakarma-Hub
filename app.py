@@ -15,6 +15,7 @@ load_dotenv()
 from utils import get_db_connection
 from models import *
 from routes import *
+from alexa_api import alexa_bp
 from email_service import send_email
 
 app = Flask(__name__)
@@ -30,6 +31,7 @@ app.register_blueprint(patient_bp)
 app.register_blueprint(centre_bp)
 app.register_blueprint(doctor_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(alexa_bp)
 
 @app.route('/')
 def landing():
@@ -86,6 +88,14 @@ def dashboard():
         return redirect(url_for('admin.dashboard'))
     else:
         return redirect(url_for('auth.login'))
+
+@app.route('/alexa-dashboard')
+def alexa_dashboard():
+    """Alexa-enhanced dashboard for centres"""
+    if 'user_id' not in session or session.get('role') != 'centre':
+        return redirect(url_for('auth.login'))
+    
+    return render_template('centre/alexa_dashboard.html')
 
 @app.route('/api/centres')
 def api_centres():

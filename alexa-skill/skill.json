@@ -1,0 +1,202 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "panchakarma manager",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "AddDoctorIntent",
+          "slots": [
+            {
+              "name": "DoctorName",
+              "type": "AMAZON.Person"
+            },
+            {
+              "name": "CertificationStatus",
+              "type": "CertificationStatusType"
+            }
+          ],
+          "samples": [
+            "add {DoctorName} to the center if {CertificationStatus}",
+            "add a new {CertificationStatus} doctor named {DoctorName}",
+            "add doctor {DoctorName} if {CertificationStatus}",
+            "add {DoctorName} as a doctor if certified",
+            "add certified doctor {DoctorName}",
+            "add new doctor {DoctorName} with certification"
+          ]
+        },
+        {
+          "name": "AssignDoctorIntent",
+          "slots": [
+            {
+              "name": "PatientName",
+              "type": "AMAZON.Person"
+            },
+            {
+              "name": "DoctorName",
+              "type": "AMAZON.Person"
+            }
+          ],
+          "samples": [
+            "assign a doctor to patient {PatientName}",
+            "assign {DoctorName} to patient {PatientName}",
+            "assign doctor to {PatientName} according to schedule",
+            "assign {DoctorName} to {PatientName} according to schedule",
+            "assign available doctor to {PatientName}",
+            "assign {DoctorName} to patient {PatientName} based on schedule"
+          ]
+        },
+        {
+          "name": "CheckBedIntent",
+          "slots": [
+            {
+              "name": "TimePeriod",
+              "type": "TimePeriodType"
+            }
+          ],
+          "samples": [
+            "check available beds for {TimePeriod}",
+            "check bed availability for {TimePeriod}",
+            "how many beds are available for {TimePeriod}",
+            "show me available beds for {TimePeriod}",
+            "check bed status for {TimePeriod}",
+            "what beds are available for {TimePeriod}"
+          ]
+        },
+        {
+          "name": "AllocateRoomIntent",
+          "slots": [
+            {
+              "name": "PatientName",
+              "type": "AMAZON.Person"
+            },
+            {
+              "name": "RoomType",
+              "type": "RoomTypeType"
+            }
+          ],
+          "samples": [
+            "allocate a {RoomType} room for patient {PatientName}",
+            "allocate {RoomType} room for {PatientName}",
+            "assign {RoomType} room to patient {PatientName}",
+            "book {RoomType} room for {PatientName}",
+            "allocate room for {PatientName} of type {RoomType}",
+            "reserve {RoomType} room for patient {PatientName}"
+          ]
+        },
+        {
+          "name": "GetCentreStatusIntent",
+          "samples": [
+            "what is the centre status",
+            "show me centre statistics",
+            "give me centre overview",
+            "centre dashboard status",
+            "show centre information"
+          ]
+        }
+      ],
+      "types": [
+        {
+          "name": "CertificationStatusType",
+          "values": [
+            {
+              "name": {
+                "value": "certified"
+              }
+            },
+            {
+              "name": {
+                "value": "not certified"
+              }
+            },
+            {
+              "name": {
+                "value": "verified"
+              }
+            },
+            {
+              "name": {
+                "value": "unverified"
+              }
+            }
+          ]
+        },
+        {
+          "name": "TimePeriodType",
+          "values": [
+            {
+              "name": {
+                "value": "today"
+              }
+            },
+            {
+              "name": {
+                "value": "this week"
+              }
+            },
+            {
+              "name": {
+                "value": "this month"
+              }
+            },
+            {
+              "name": {
+                "value": "tomorrow"
+              }
+            },
+            {
+              "name": {
+                "value": "next week"
+              }
+            }
+          ]
+        },
+        {
+          "name": "RoomTypeType",
+          "values": [
+            {
+              "name": {
+                "value": "general ward"
+              }
+            },
+            {
+              "name": {
+                "value": "normal room"
+              }
+            },
+            {
+              "name": {
+                "value": "VIP room"
+              }
+            },
+            {
+              "name": {
+                "value": "special room"
+              }
+            },
+            {
+              "name": {
+                "value": "panchakarma therapy"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

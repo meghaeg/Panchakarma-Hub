@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash, current_app
 from datetime import datetime, timedelta
-from models import Patient, Centre, Doctor, Appointment, DetoxAppointment, Feedback, Admin, ProgressTracking, Notification, ZoomMeeting
+from models import Patient, Centre, Doctor, Appointment, DetoxAppointment, Feedback, Admin, ProgressTracking, Notification, ZoomMeeting, Bed
 from utils import *
 from email_service import *
 from sms_service import send_sms
@@ -515,7 +515,14 @@ def request_zoom_meeting():
             today_str = datetime.now().strftime('%Y-%m-%d')
             send_zoom_request_to_centre(centre_info.get('email',''), centre_info.get('name','Centre'), patient_info.get('name','Patient'), today_str, slot)
 
-        return jsonify({'success': True, 'message': 'Zoom meeting requested. Await approval.', 'id': getattr(res, 'inserted_id', None)})
+        # Avoid returning raw ObjectId which is not JSON serializable
+        _id = getattr(res, 'inserted_id', None)
+        if _id is not None:
+            try:
+                _id = str(_id)
+            except Exception:
+                pass
+        return jsonify({'success': True, 'message': 'Zoom meeting requested. Await approval.', 'id': _id})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
@@ -854,7 +861,11 @@ def dashboard():
     doctor = Doctor()
     doctors = doctor.find_by_centre(centre_id)
     
-    return render_template('centre/dashboard.html', appointments=appointments, doctors=doctors)
+    # Get bed statistics
+    bed = Bed()
+    bed_stats = bed.get_bed_statistics(centre_id)
+    
+    return render_template('centre/dashboard.html', appointments=appointments, doctors=doctors, bed_stats=bed_stats)
 
 @centre_bp.route('/add-doctor', methods=['GET', 'POST'])
 def add_doctor():
@@ -2376,6 +2387,251 @@ def mark_all_centre_notifications_read():
         
     except Exception as e:
         print(f"Error in mark_all_centre_notifications_read: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+# Bed Management Routes
+@centre_bp.route('/bed-management')
+def bed_management():
+    """Bed management dashboard"""
+    if session.get('role') != 'centre':
+        return redirect(url_for('auth.login'))
+    
+    try:
+        centre_id = session.get('user_id')
+        bed = Bed()
+        
+        # Get bed statistics
+        stats = bed.get_bed_statistics(centre_id)
+        
+        # Get all beds
+        beds = bed.find_by_centre(centre_id)
+        
+        # Get recent patients for bed allocation
+        db = get_db_connection()
+        recent_patients = list(db.patients.find().sort('created_at', -1).limit(20))
+        
+        return render_template('centre/bed_management.html', 
+                             beds=beds, 
+                             stats=stats, 
+                             recent_patients=recent_patients)
+        
+    except Exception as e:
+        print(f"Error in bed_management: {str(e)}")
+        flash('Error loading bed management', 'error')
+        return redirect(url_for('centre.dashboard'))
+
+
+@centre_bp.route('/add-bed', methods=['POST'])
+def add_bed():
+    """Add new bed"""
+    if session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        data = request.get_json()
+        centre_id = session.get('user_id')
+        
+        # Generate bed ID
+        bed_id = f"BED{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
+        bed_data = {
+            'bed_id': bed_id,
+            'centre_id': centre_id,
+            'bed_type': data['bed_type'],
+            'room_number': data['room_number'],
+            'location': data.get('location', ''),
+            'price_per_day': float(data.get('price_per_day', 0)),
+            'features': data.get('features', [])
+        }
+        
+        bed = Bed()
+        result = bed.create(bed_data)
+        
+        if result.inserted_id:
+            return jsonify({'success': True, 'message': 'Bed added successfully', 'bed_id': bed_id})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to add bed'})
+            
+    except Exception as e:
+        print(f"Error in add_bed: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@centre_bp.route('/allocate-bed', methods=['POST'])
+def allocate_bed():
+    """Allocate bed to patient"""
+    if session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        data = request.get_json()
+        bed_id = data['bed_id']
+        patient_id = data['patient_id']
+        
+        # Get patient details
+        db = get_db_connection()
+        patient = db.patients.find_one({'patient_id': patient_id})
+        if not patient:
+            return jsonify({'success': False, 'message': 'Patient not found'})
+        
+        bed = Bed()
+        result = bed.allocate_bed(bed_id, patient_id, patient['name'])
+        
+        if result.modified_count > 0:
+            return jsonify({'success': True, 'message': 'Bed allocated successfully'})
+        else:
+            return jsonify({'success': False, 'message': 'Bed allocation failed'})
+            
+    except Exception as e:
+        print(f"Error in allocate_bed: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@centre_bp.route('/checkout-bed', methods=['POST'])
+def checkout_bed():
+    """Checkout patient from bed"""
+    if session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        data = request.get_json()
+        bed_id = data['bed_id']
+        
+        bed = Bed()
+        result = bed.checkout_bed(bed_id)
+        
+        if result.modified_count > 0:
+            return jsonify({'success': True, 'message': 'Patient checked out successfully'})
+        else:
+            return jsonify({'success': False, 'message': 'Checkout failed'})
+            
+    except Exception as e:
+        print(f"Error in checkout_bed: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@centre_bp.route('/mark-bed-available', methods=['POST'])
+def mark_bed_available():
+    """Mark bed as available after cleaning"""
+    if session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        data = request.get_json()
+        bed_id = data['bed_id']
+        
+        bed = Bed()
+        result = bed.mark_available(bed_id)
+        
+        if result.modified_count > 0:
+            return jsonify({'success': True, 'message': 'Bed marked as available'})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to mark bed as available'})
+            
+    except Exception as e:
+        print(f"Error in mark_bed_available: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@centre_bp.route('/reserve-bed', methods=['POST'])
+def reserve_bed():
+    """Reserve bed for patient"""
+    if session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        data = request.get_json()
+        bed_id = data['bed_id']
+        patient_id = data['patient_id']
+        
+        # Get patient details
+        db = get_db_connection()
+        patient = db.patients.find_one({'patient_id': patient_id})
+        if not patient:
+            return jsonify({'success': False, 'message': 'Patient not found'})
+        
+        bed = Bed()
+        result = bed.reserve_bed(bed_id, patient_id, patient['name'])
+        
+        if result.modified_count > 0:
+            return jsonify({'success': True, 'message': 'Bed reserved successfully'})
+        else:
+            return jsonify({'success': False, 'message': 'Bed reservation failed'})
+            
+    except Exception as e:
+        print(f"Error in reserve_bed: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@centre_bp.route('/cancel-reservation', methods=['POST'])
+def cancel_reservation():
+    """Cancel bed reservation"""
+    if session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        data = request.get_json()
+        bed_id = data['bed_id']
+        
+        bed = Bed()
+        result = bed.cancel_reservation(bed_id)
+        
+        if result.modified_count > 0:
+            return jsonify({'success': True, 'message': 'Reservation cancelled successfully'})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to cancel reservation'})
+            
+    except Exception as e:
+        print(f"Error in cancel_reservation: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@centre_bp.route('/api/beds')
+def api_beds():
+    """API endpoint for bed data"""
+    if session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        centre_id = session.get('user_id')
+        bed = Bed()
+        
+        # Get filters from query parameters
+        filters = {}
+        if request.args.get('bed_type'):
+            filters['bed_type'] = request.args.get('bed_type')
+        if request.args.get('status'):
+            filters['status'] = request.args.get('status')
+        if request.args.get('room_number'):
+            filters['room_number'] = request.args.get('room_number')
+        if request.args.get('patient_name'):
+            filters['patient_name'] = request.args.get('patient_name')
+        
+        beds = bed.search_beds(centre_id, filters)
+        
+        return jsonify({'success': True, 'beds': beds})
+        
+    except Exception as e:
+        print(f"Error in api_beds: {str(e)}")
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+@centre_bp.route('/api/bed-stats')
+def api_bed_stats():
+    """API endpoint for bed statistics"""
+    if session.get('role') != 'centre':
+        return jsonify({'success': False, 'message': 'Unauthorized'})
+    
+    try:
+        centre_id = session.get('user_id')
+        bed = Bed()
+        stats = bed.get_bed_statistics(centre_id)
+        
+        return jsonify({'success': True, 'stats': stats})
+        
+    except Exception as e:
+        print(f"Error in api_bed_stats: {str(e)}")
         return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
 
 

@@ -27,7 +27,7 @@
 
 	<!-- Quick Stats -->
 	<div class="row mb-4">
-		<div class="col-md-3">
+		<div class="col-md-2">
 			<div class="card text-center">
 				<div class="card-body">
 					<i class="fas fa-user-md text-primary" style="font-size: 2rem;"></i>
@@ -36,7 +36,7 @@
 				</div>
 			</div>
 		</div>
-		<div class="col-md-3">
+		<div class="col-md-2">
 			<div class="card text-center">
 				<div class="card-body">
 					<i class="fas fa-clock text-warning" style="font-size: 2rem;"></i>
@@ -45,7 +45,7 @@
 				</div>
 			</div>
 		</div>
-		<div class="col-md-3">
+		<div class="col-md-2">
 			<div class="card text-center">
 				<div class="card-body">
 					<i class="fas fa-check-circle text-success" style="font-size: 2rem;"></i>
@@ -54,12 +54,30 @@
 				</div>
 			</div>
 		</div>
-		<div class="col-md-3">
+		<div class="col-md-2">
 			<div class="card text-center">
 				<div class="card-body">
 					<i class="fas fa-check-circle text-info" style="font-size: 2rem;"></i>
 					<h5 class="mt-2">{{ appointments|selectattr('status', 'equalto', 'completed')|list|length }}</h5>
 					<p class="text-muted mb-0">Completed</p>
+				</div>
+			</div>
+		</div>
+		<div class="col-md-2">
+			<div class="card text-center">
+				<div class="card-body">
+					<i class="fas fa-bed text-primary" style="font-size: 2rem;"></i>
+					<h5 class="mt-2">{{ bed_stats.total }}</h5>
+					<p class="text-muted mb-0">Total Beds</p>
+				</div>
+			</div>
+		</div>
+		<div class="col-md-2">
+			<div class="card text-center">
+				<div class="card-body">
+					<i class="fas fa-user text-danger" style="font-size: 2rem;"></i>
+					<h5 class="mt-2">{{ bed_stats.occupied }}</h5>
+					<p class="text-muted mb-0">Occupied</p>
 				</div>
 			</div>
 		</div>
@@ -159,9 +177,51 @@
 			</div>
 		</div>
 
-		<!-- Doctors & Quick Actions -->
+		<!-- Bed Management Overview -->
 		<div class="col-lg-4">
 			<div class="card">
+				<div class="card-header">
+					<h5 class="mb-0"><i class="fas fa-bed"></i> Bed Management</h5>
+				</div>
+				<div class="card-body">
+					<div class="row text-center mb-3">
+						<div class="col-6">
+							<div class="border rounded p-2">
+								<h6 class="text-success mb-0">{{ bed_stats.available }}</h6>
+								<small class="text-muted">Available</small>
+							</div>
+						</div>
+						<div class="col-6">
+							<div class="border rounded p-2">
+								<h6 class="text-danger mb-0">{{ bed_stats.occupied }}</h6>
+								<small class="text-muted">Occupied</small>
+							</div>
+						</div>
+					</div>
+					<div class="row text-center mb-3">
+						<div class="col-6">
+							<div class="border rounded p-2">
+								<h6 class="text-warning mb-0">{{ bed_stats.under_cleaning }}</h6>
+								<small class="text-muted">Cleaning</small>
+							</div>
+						</div>
+						<div class="col-6">
+							<div class="border rounded p-2">
+								<h6 class="text-info mb-0">{{ bed_stats.reserved }}</h6>
+								<small class="text-muted">Reserved</small>
+							</div>
+						</div>
+					</div>
+					<div class="d-grid">
+						<a href="/centre/bed-management" class="btn btn-primary">
+							<i class="fas fa-bed"></i> Manage Beds
+						</a>
+					</div>
+				</div>
+			</div>
+
+			<!-- Doctors -->
+			<div class="card mt-3">
 				<div class="card-header">
 					<h5 class="mb-0"><i class="fas fa-user-md"></i> Our Doctors</h5>
 				</div>
@@ -211,6 +271,9 @@
 				</div>
 				<div class="card-body">
 					<div class="d-grid gap-2">
+						<a href="/centre/bed-management" class="btn btn-primary">
+							<i class="fas fa-bed"></i> Bed Management
+						</a>
 						<a href="/centre/detox-dashboard" class="btn btn-success">
 							<i class="fas fa-heartbeat"></i> Manage Detox Therapy
 						</a>

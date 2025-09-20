@@ -34,7 +34,9 @@ class InMemoryDB:
             'detox_appointments': [],
             'progress_tracking': [],
             'notifications': [],
-            'feedback': []
+            'feedback': [],
+            'beds': [],
+            'zoom_meetings': []
         }
         self._init_sample_data()
     
@@ -123,19 +125,61 @@ class InMemoryCollection:
     def find(self, query=None):
         """Find documents matching query"""
         if query is None:
-            return self.data
-        return [item for item in self.data if all(item.get(k) == v for k, v in query.items())]
+            return InMemoryCursor(self.data)
+        results = [item for item in self.data if all(item.get(k) == v for k, v in query.items())]
+        return InMemoryCursor(results)
     
     def insert_one(self, document):
         """Insert one document"""
         self.data.append(document)
         return type('InsertResult', (), {'inserted_id': len(self.data), 'acknowledged': True})()
     
+    def update_one(self, query, update):
+        """Update one document"""
+        for i, item in enumerate(self.data):
+            if all(item.get(k) == v for k, v in query.items()):
+                if '$set' in update:
+                    item.update(update['$set'])
+                return type('UpdateResult', (), {'modified_count': 1, 'acknowledged': True})()
+        return type('UpdateResult', (), {'modified_count': 0, 'acknowledged': True})()
+    
+    def delete_one(self, query):
+        """Delete one document"""
+        for i, item in enumerate(self.data):
+            if all(item.get(k) == v for k, v in query.items()):
+                del self.data[i]
+                return type('DeleteResult', (), {'deleted_count': 1, 'acknowledged': True})()
+        return type('DeleteResult', (), {'deleted_count': 0, 'acknowledged': True})()
+    
     def count_documents(self, query=None):
         """Count documents"""
         if query is None:
             return len(self.data)
-        return len(self.find(query))
+        return len([item for item in self.data if all(item.get(k) == v for k, v in query.items())])
+
+class InMemoryCursor:
+    """Cursor-like interface for in-memory data"""
+    def __init__(self, data):
+        self.data = data
+    
+    def sort(self, sort_list):
+        """Sort the data"""
+        if isinstance(sort_list, list) and len(sort_list) > 0:
+            # Handle MongoDB-style sort: [('field', 1), ('field2', -1)]
+            for field, direction in reversed(sort_list):
+                self.data.sort(key=lambda x: x.get(field, ''), reverse=(direction == -1))
+        return self
+    
+    def limit(self, n):
+        """Limit the number of results"""
+        self.data = self.data[:n]
+        return self
+    
+    def __iter__(self):
+        return iter(self.data)
+    
+    def __len__(self):
+        return len(self.data)
 
 def generate_appointment_id():
     """Generate unique appointment ID"""

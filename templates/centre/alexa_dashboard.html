@@ -1,0 +1,1033 @@
+{% extends "base.html" %}
+
+{% block title %}Alexa-Enhanced Centre Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stats-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #007bff;
+    }
+    
+    .stats-card h3 {
+        margin: 0 0 15px 0;
+        color: #333;
+        font-size: 18px;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 15px;
+    }
+    
+    .stat-item {
+        text-align: center;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+    
+    .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #007bff;
+        display: block;
+    }
+    
+    .stat-label {
+        font-size: 12px;
+        color: #666;
+        text-transform: uppercase;
+        margin-top: 5px;
+    }
+    
+    .alexa-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .alexa-section h2 {
+        margin: 0 0 15px 0;
+        display: flex;
+        align-items: center;
+    }
+    
+    .alexa-icon {
+        font-size: 24px;
+        margin-right: 10px;
+    }
+    
+    .voice-commands {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    
+    .voice-command {
+        background: rgba(255,255,255,0.1);
+        padding: 15px;
+        border-radius: 6px;
+        border-left: 3px solid #fff;
+    }
+    
+    .voice-command h4 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+    }
+    
+    .voice-command p {
+        margin: 0;
+        font-size: 12px;
+        opacity: 0.9;
+    }
+    
+    .recent-activities {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .recent-activities h3 {
+        margin: 0 0 15px 0;
+        color: #333;
+        font-size: 18px;
+    }
+    
+    .activity-item {
+        display: flex;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+    
+    .activity-icon {
+        font-size: 20px;
+        margin-right: 12px;
+        width: 30px;
+        text-align: center;
+    }
+    
+    .activity-content {
+        flex: 1;
+    }
+    
+    .activity-message {
+        font-size: 14px;
+        margin-bottom: 2px;
+        color: #333;
+    }
+    
+    .activity-time {
+        font-size: 12px;
+        color: #666;
+    }
+    
+    .connection-status {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        z-index: 1000;
+    }
+    
+    .connection-status.connected {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .connection-status.disconnected {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .real-time-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #28a745;
+        margin-right: 5px;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    
+    .bed-management {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-top: 20px;
+    }
+    
+    .bed-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    
+    .bed-card {
+        padding: 15px;
+        border-radius: 6px;
+        border: 2px solid #e9ecef;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .bed-card.available {
+        border-color: #28a745;
+        background: #f8fff9;
+    }
+    
+    .bed-card.occupied {
+        border-color: #dc3545;
+        background: #fff8f8;
+    }
+    
+    .bed-card.under-cleaning {
+        border-color: #ffc107;
+        background: #fffdf5;
+    }
+    
+    .bed-number {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .bed-status {
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 12px;
+        text-transform: uppercase;
+        font-weight: bold;
+    }
+    
+    .bed-status.available {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .bed-status.occupied {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .bed-status.under-cleaning {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .patient-name {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+    }
+    
+    /* Voice Input Styles */
+    .voice-input-section {
+        margin: 30px 0;
+    }
+    
+    .voice-input-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        padding: 30px;
+        color: white;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
+    
+    .voice-input-card h3 {
+        margin: 0 0 10px 0;
+        font-size: 24px;
+        font-weight: 600;
+    }
+    
+    .voice-input-card p {
+        margin: 0 0 25px 0;
+        opacity: 0.9;
+        font-size: 16px;
+    }
+    
+    .voice-controls {
+        margin: 25px 0;
+    }
+    
+    .voice-button {
+        background: rgba(255,255,255,0.2);
+        border: 2px solid rgba(255,255,255,0.3);
+        color: white;
+        padding: 15px 30px;
+        border-radius: 50px;
+        font-size: 18px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .voice-button:hover {
+        background: rgba(255,255,255,0.3);
+        border-color: rgba(255,255,255,0.5);
+        transform: translateY(-2px);
+    }
+    
+    .voice-button.listening {
+        background: #ff6b6b;
+        border-color: #ff5252;
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    .voice-status {
+        margin-top: 15px;
+        font-size: 16px;
+        opacity: 0.8;
+    }
+    
+    .voice-result {
+        background: rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+        text-align: left;
+    }
+    
+    .voice-result h4 {
+        margin: 0 0 10px 0;
+        color: #fff;
+    }
+    
+    .voice-response {
+        background: rgba(0,0,0,0.2);
+        padding: 15px;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    
+    .voice-examples {
+        margin-top: 25px;
+    }
+    
+    .voice-examples h4 {
+        margin: 0 0 15px 0;
+        font-size: 18px;
+    }
+    
+    .example-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+    }
+    
+    .example-btn {
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.3);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .example-btn:hover {
+        background: rgba(255,255,255,0.3);
+        transform: translateY(-1px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Connection Status Indicator -->
+    <div id="connection-status" class="connection-status disconnected">
+        <span id="status-indicator" class="real-time-indicator"></span>
+        <span id="status-text">Connecting...</span>
+    </div>
+    
+    <h1 class="mb-4">
+        <i class="fas fa-microphone-alt"></i> Alexa-Enhanced Centre Dashboard
+        <small class="text-muted">Real-time Management</small>
+    </h1>
+    
+    <!-- Alexa Voice Commands Section -->
+    <div class="alexa-section">
+        <h2>
+            <span class="alexa-icon">🎤</span>
+            Alexa Voice Commands
+        </h2>
+        <p>Use these voice commands with your Alexa device to manage your center:</p>
+        
+        <div class="voice-commands">
+            <div class="voice-command">
+                <h4>Add Doctor</h4>
+                <p>"Alexa, add Dr. [Name] to the center if certified"</p>
+            </div>
+            <div class="voice-command">
+                <h4>Assign Doctor</h4>
+                <p>"Alexa, assign a doctor to patient [Name]"</p>
+            </div>
+            <div class="voice-command">
+                <h4>Check Beds</h4>
+                <p>"Alexa, check available beds for this week"</p>
+            </div>
+            <div class="voice-command">
+                <h4>Allocate Room</h4>
+                <p>"Alexa, allocate a VIP room for patient [Name]"</p>
+            </div>
+            <div class="voice-command">
+                <h4>Centre Status</h4>
+                <p>"Alexa, what is the centre status"</p>
+            </div>
+    </div>
+</div>
+
+<!-- Voice Input Section -->
+<div class="voice-input-section">
+    <div class="voice-input-card">
+        <h3><i class="fas fa-microphone"></i> Try Voice Commands Here</h3>
+        <p>Click the microphone and speak your command directly to this webpage!</p>
+        
+        <div class="voice-controls">
+            <button id="voiceButton" class="voice-button">
+                <i class="fas fa-microphone"></i>
+                <span id="voiceButtonText">Click to Speak</span>
+            </button>
+            <div id="voiceStatus" class="voice-status">Ready to listen...</div>
+        </div>
+        
+        <div id="voiceResult" class="voice-result" style="display: none;">
+            <h4>Alexa Response:</h4>
+            <div id="voiceResponse" class="voice-response"></div>
+        </div>
+        
+        <div class="voice-examples">
+            <h4>Quick Examples:</h4>
+            <div class="example-buttons">
+                <button class="example-btn" onclick="speakCommand('what is the centre status')">Centre Status</button>
+                <button class="example-btn" onclick="speakCommand('add Dr. Sarah to the center if certified')">Add Doctor</button>
+                <button class="example-btn" onclick="speakCommand('check available beds')">Check Beds</button>
+                <button class="example-btn" onclick="speakCommand('allocate a VIP room for patient John')">Allocate Room</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dashboard Statistics -->
+<div class="dashboard-container">
+        <div class="stats-card">
+            <h3><i class="fas fa-user-md"></i> Doctors</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span id="total-doctors" class="stat-value">0</span>
+                    <div class="stat-label">Total</div>
+                </div>
+                <div class="stat-item">
+                    <span id="active-doctors" class="stat-value">0</span>
+                    <div class="stat-label">Active</div>
+                </div>
+                <div class="stat-item">
+                    <span id="new-doctors-today" class="stat-value">0</span>
+                    <div class="stat-label">Added Today</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stats-card">
+            <h3><i class="fas fa-calendar-check"></i> Appointments</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span id="total-appointments" class="stat-value">0</span>
+                    <div class="stat-label">Total</div>
+                </div>
+                <div class="stat-item">
+                    <span id="today-appointments" class="stat-value">0</span>
+                    <div class="stat-label">Today</div>
+                </div>
+                <div class="stat-item">
+                    <span id="pending-appointments" class="stat-value">0</span>
+                    <div class="stat-label">Pending</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bed Management -->
+    <div class="bed-management">
+        <h3><i class="fas fa-bed"></i> Bed Management</h3>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span id="total-beds" class="stat-value">0</span>
+                <div class="stat-label">Total Beds</div>
+            </div>
+            <div class="stat-item">
+                <span id="available-beds" class="stat-value">0</span>
+                <div class="stat-label">Available</div>
+            </div>
+            <div class="stat-item">
+                <span id="occupied-beds" class="stat-value">0</span>
+                <div class="stat-label">Occupied</div>
+            </div>
+            <div class="stat-item">
+                <span id="occupancy-rate" class="stat-value">0%</span>
+                <div class="stat-label">Occupancy Rate</div>
+            </div>
+        </div>
+        
+        <div id="bed-grid" class="bed-grid">
+            <!-- Bed cards will be populated by JavaScript -->
+        </div>
+    </div>
+    
+    <!-- Recent Activities -->
+    <div class="recent-activities">
+        <h3><i class="fas fa-history"></i> Recent Activities</h3>
+        <div id="recent-activities">
+            <div class="activity-item">
+                <div class="activity-icon">⏳</div>
+                <div class="activity-content">
+                    <div class="activity-message">Loading recent activities...</div>
+                    <div class="activity-time">Please wait</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/websocket-client.js') }}"></script>
+<script>
+// Enhanced WebSocket integration for the dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize WebSocket manager
+    const wsManager = new WebSocketManager();
+    window.wsManager = wsManager; // Make it globally accessible
+    
+    // Handle connection status updates
+    wsManager.on('connected', function() {
+        updateConnectionStatus(true);
+    });
+    
+    wsManager.on('disconnected', function() {
+        updateConnectionStatus(false);
+    });
+    
+    wsManager.on('reconnect_failed', function() {
+        updateConnectionStatus(false, 'Reconnection failed');
+        // Add a manual reconnect option
+        addReconnectButton();
+    });
+    
+    // Handle real-time updates
+    wsManager.on('update', function(data) {
+        console.log('Real-time update received:', data);
+        
+        // Update specific sections based on update type
+        switch(data.type) {
+            case 'doctor_added':
+                updateDoctorStats();
+                break;
+            case 'appointment_created':
+                updateAppointmentStats();
+                break;
+            case 'bed_status_changed':
+                updateBedStats();
+                updateBedGrid();
+                break;
+        }
+    });
+    
+    // Load initial data
+    loadInitialData();
+    
+    // Set up periodic updates for non-WebSocket data
+    setInterval(updateBedGrid, 30000); // Update bed grid every 30 seconds
+    
+    // Initialize voice input functionality
+    initializeVoiceInput();
+});
+
+function updateConnectionStatus(connected, message = null) {
+    const statusElement = document.getElementById('connection-status');
+    const indicatorElement = document.getElementById('status-indicator');
+    const textElement = document.getElementById('status-text');
+    
+    if (connected) {
+        statusElement.className = 'connection-status connected';
+        textElement.textContent = message || 'Connected';
+        indicatorElement.style.background = '#28a745';
+        // Remove reconnect button if it exists
+        removeReconnectButton();
+    } else {
+        statusElement.className = 'connection-status disconnected';
+        textElement.textContent = message || 'Disconnected';
+        indicatorElement.style.background = '#dc3545';
+    }
+}
+
+function addReconnectButton() {
+    // Check if button already exists
+    if (document.getElementById('reconnect-btn')) return;
+    
+    const statusElement = document.getElementById('connection-status');
+    const reconnectBtn = document.createElement('button');
+    reconnectBtn.id = 'reconnect-btn';
+    reconnectBtn.textContent = 'Reconnect';
+    reconnectBtn.style.cssText = `
+        margin-left: 10px;
+        padding: 4px 8px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+    `;
+    reconnectBtn.onclick = function() {
+        reconnectBtn.textContent = 'Connecting...';
+        reconnectBtn.disabled = true;
+        
+        // Try to reconnect
+        if (window.wsManager) {
+            window.wsManager.reconnectAttempts = 0;
+            window.wsManager.connect();
+        }
+        
+        setTimeout(() => {
+            reconnectBtn.textContent = 'Reconnect';
+            reconnectBtn.disabled = false;
+        }, 3000);
+    };
+    
+    statusElement.appendChild(reconnectBtn);
+}
+
+function removeReconnectButton() {
+    const reconnectBtn = document.getElementById('reconnect-btn');
+    if (reconnectBtn) {
+        reconnectBtn.remove();
+    }
+}
+
+async function loadInitialData() {
+    try {
+        // Load dashboard statistics
+        const response = await fetch('/api/dashboard-stats');
+        const data = await response.json();
+        
+        if (data.success) {
+            updateDashboardStats(data.data);
+        }
+    } catch (error) {
+        console.error('Error loading initial data:', error);
+    }
+}
+
+function updateDashboardStats(data) {
+    // Update doctor statistics
+    if (data.doctors) {
+        document.getElementById('total-doctors').textContent = data.doctors.total || 0;
+        document.getElementById('active-doctors').textContent = data.doctors.active || 0;
+        document.getElementById('new-doctors-today').textContent = data.doctors.new_today || 0;
+    }
+    
+    // Update appointment statistics
+    if (data.appointments) {
+        document.getElementById('total-appointments').textContent = data.appointments.total || 0;
+        document.getElementById('today-appointments').textContent = data.appointments.today || 0;
+        document.getElementById('pending-appointments').textContent = data.appointments.pending || 0;
+    }
+    
+    // Update bed statistics
+    if (data.beds) {
+        document.getElementById('total-beds').textContent = data.beds.total || 0;
+        document.getElementById('available-beds').textContent = data.beds.available || 0;
+        document.getElementById('occupied-beds').textContent = data.beds.occupied || 0;
+        document.getElementById('occupancy-rate').textContent = `${data.beds.occupancy_rate || 0}%`;
+    }
+}
+
+async function updateDoctorStats() {
+    try {
+        const response = await fetch('/api/doctor-stats');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('total-doctors').textContent = data.total || 0;
+            document.getElementById('active-doctors').textContent = data.active || 0;
+        }
+    } catch (error) {
+        console.error('Error updating doctor stats:', error);
+    }
+}
+
+async function updateAppointmentStats() {
+    try {
+        const response = await fetch('/api/appointment-stats');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('total-appointments').textContent = data.total || 0;
+            document.getElementById('today-appointments').textContent = data.today || 0;
+            document.getElementById('pending-appointments').textContent = data.pending || 0;
+        }
+    } catch (error) {
+        console.error('Error updating appointment stats:', error);
+    }
+}
+
+async function updateBedStats() {
+    try {
+        const response = await fetch('/api/bed-statistics');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('total-beds').textContent = data.total || 0;
+            document.getElementById('available-beds').textContent = data.available || 0;
+            document.getElementById('occupied-beds').textContent = data.occupied || 0;
+            document.getElementById('occupancy-rate').textContent = `${data.occupancy_rate || 0}%`;
+        }
+    } catch (error) {
+        console.error('Error updating bed stats:', error);
+    }
+}
+
+async function updateBedGrid() {
+    try {
+        const response = await fetch('/api/beds');
+        const data = await response.json();
+        
+        if (data.success) {
+            const bedGrid = document.getElementById('bed-grid');
+            bedGrid.innerHTML = '';
+            
+            data.beds.forEach(bed => {
+                const bedCard = createBedCard(bed);
+                bedGrid.appendChild(bedCard);
+            });
+        }
+    } catch (error) {
+        console.error('Error updating bed grid:', error);
+    }
+}
+
+function createBedCard(bed) {
+    const card = document.createElement('div');
+    card.className = `bed-card ${bed.status}`;
+    
+    card.innerHTML = `
+        <div class="bed-number">${bed.room_number}</div>
+        <div class="bed-status ${bed.status}">${bed.status.replace('_', ' ')}</div>
+        ${bed.current_patient_name ? `<div class="patient-name">${bed.current_patient_name}</div>` : ''}
+    `;
+    
+    return card;
+}
+
+// Voice Input Functionality
+let recognition = null;
+let isListening = false;
+
+function initializeVoiceInput() {
+    // Check if browser supports speech recognition
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        document.getElementById('voiceStatus').textContent = 'Voice input not supported in this browser';
+        document.getElementById('voiceButton').disabled = true;
+        return;
+    }
+    
+    // Initialize speech recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    
+    // Set up event handlers
+    recognition.onstart = function() {
+        isListening = true;
+        updateVoiceButton(true);
+        document.getElementById('voiceStatus').textContent = 'Listening... Speak now!';
+    };
+    
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('voiceStatus').textContent = `Heard: "${transcript}"`;
+        processVoiceCommand(transcript);
+    };
+    
+    recognition.onerror = function(event) {
+        console.error('Speech recognition error:', event.error);
+        document.getElementById('voiceStatus').textContent = `Error: ${event.error}`;
+        updateVoiceButton(false);
+    };
+    
+    recognition.onend = function() {
+        isListening = false;
+        updateVoiceButton(false);
+        if (document.getElementById('voiceStatus').textContent.includes('Listening')) {
+            document.getElementById('voiceStatus').textContent = 'Ready to listen...';
+        }
+    };
+    
+    // Set up button click handler
+    document.getElementById('voiceButton').addEventListener('click', toggleVoiceInput);
+}
+
+function toggleVoiceInput() {
+    if (isListening) {
+        recognition.stop();
+    } else {
+        recognition.start();
+    }
+}
+
+function updateVoiceButton(listening) {
+    const button = document.getElementById('voiceButton');
+    const buttonText = document.getElementById('voiceButtonText');
+    
+    if (listening) {
+        button.classList.add('listening');
+        buttonText.textContent = 'Stop Listening';
+    } else {
+        button.classList.remove('listening');
+        buttonText.textContent = 'Click to Speak';
+    }
+}
+
+function speakCommand(command) {
+    // Simulate voice input for example buttons
+    document.getElementById('voiceStatus').textContent = `Speaking: "${command}"`;
+    processVoiceCommand(command);
+}
+
+function processVoiceCommand(transcript) {
+    const command = transcript.toLowerCase().trim();
+    document.getElementById('voiceStatus').textContent = `Processing: "${command}"`;
+    
+    // Show immediate response for better UX
+    showVoiceResponse(`🎤 Processing: "${command}"`);
+    
+    // Set a timeout to prevent hanging
+    const timeoutId = setTimeout(() => {
+        document.getElementById('voiceStatus').textContent = 'Ready to listen...';
+    }, 5000);
+    
+    // Map voice commands to actions
+    if (command.includes('centre status') || command.includes('center status') || command.includes('status')) {
+        handleCentreStatusCommand(timeoutId);
+    } else if (command.includes('add doctor') || command.includes('add dr')) {
+        handleAddDoctorCommand(command, timeoutId);
+    } else if (command.includes('check beds') || command.includes('available beds') || command.includes('beds')) {
+        handleCheckBedsCommand(timeoutId);
+    } else if (command.includes('allocate room') || command.includes('allocate vip') || command.includes('allocate')) {
+        handleAllocateRoomCommand(command, timeoutId);
+    } else {
+        clearTimeout(timeoutId);
+        showVoiceResponse(`❌ I didn't understand that command. Try saying "what is the centre status" or "add doctor [name]"`);
+        document.getElementById('voiceStatus').textContent = 'Ready to listen...';
+    }
+}
+
+function handleCentreStatusCommand(timeoutId) {
+    fetch('/api/dashboard-stats')
+        .then(response => response.json())
+        .then(data => {
+            clearTimeout(timeoutId);
+            if (data.success) {
+                const stats = data.data;
+                const responseText = `📊 Centre Status:\n\n👨‍⚕️ Doctors: ${stats.doctors.total} total, ${stats.doctors.active} active\n📅 Appointments: ${stats.appointments.total} total, ${stats.appointments.today} today\n🛏️ Beds: ${stats.beds.total} total, ${stats.beds.available} available, ${stats.beds.occupied} occupied`;
+                showVoiceResponse(responseText);
+                loadInitialData(); // Refresh dashboard
+                document.getElementById('voiceStatus').textContent = '✅ Centre status retrieved!';
+            } else {
+                showVoiceResponse(`❌ Error: ${data.message || 'Unable to get centre status'}`);
+                document.getElementById('voiceStatus').textContent = '❌ Error occurred';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            console.error('API call error:', error);
+            showVoiceResponse(`❌ Error: Unable to connect to server. Please try again.`);
+            document.getElementById('voiceStatus').textContent = '❌ Connection error';
+        });
+}
+
+function handleAddDoctorCommand(command, timeoutId) {
+    // Extract doctor name
+    const nameMatch = command.match(/add (?:dr\.?|doctor)\s+(\w+)/i);
+    const doctorName = nameMatch ? nameMatch[1] : 'Unknown';
+    
+    showVoiceResponse(`👨‍⚕️ Adding Dr. ${doctorName} to the center...`);
+    
+    // Call the real API to add doctor to database
+    fetch('/api/add-doctor', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            name: doctorName,
+            specialization: 'General Medicine'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        clearTimeout(timeoutId);
+        
+        if (data.success) {
+            showVoiceResponse(`✅ Successfully added Dr. ${doctorName} to the center!\n\n🆔 Doctor ID: ${data.doctor_id}\n📋 Status: ${data.status}\n🏥 Specialization: ${data.specialization}\n📅 Added: ${new Date().toLocaleDateString()}`);
+            
+            // Update the dashboard stats
+            updateDoctorStats();
+            
+            // Show success animation
+            document.getElementById('voiceStatus').textContent = `✅ Dr. ${doctorName} added successfully!`;
+        } else {
+            if (data.message.includes('already exists')) {
+                showVoiceResponse(`ℹ️ Dr. ${doctorName} already exists in the system!\n\n🆔 Doctor ID: ${data.doctor_id || 'N/A'}\n📋 Status: Already registered`);
+                document.getElementById('voiceStatus').textContent = `ℹ️ Dr. ${doctorName} already exists`;
+            } else {
+                showVoiceResponse(`❌ Error adding Dr. ${doctorName}: ${data.message}`);
+                document.getElementById('voiceStatus').textContent = `❌ Error occurred`;
+            }
+        }
+    })
+    .catch(error => {
+        clearTimeout(timeoutId);
+        console.error('API call error:', error);
+        showVoiceResponse(`❌ Error: Unable to connect to server. Please try again.`);
+        document.getElementById('voiceStatus').textContent = `❌ Connection error`;
+    });
+}
+
+function handleCheckBedsCommand(timeoutId) {
+    fetch('/api/bed-statistics')
+        .then(response => response.json())
+        .then(data => {
+            clearTimeout(timeoutId);
+            if (data.success) {
+                const responseText = `🛏️ Bed Status:\n\n📊 Total Beds: ${data.total}\n✅ Available: ${data.available}\n❌ Occupied: ${data.occupied}\n📈 Occupancy Rate: ${data.occupancy_rate}%`;
+                showVoiceResponse(responseText);
+                loadInitialData(); // Refresh dashboard
+                document.getElementById('voiceStatus').textContent = '✅ Bed status retrieved!';
+            } else {
+                showVoiceResponse(`❌ Error: ${data.message || 'Unable to get bed information'}`);
+                document.getElementById('voiceStatus').textContent = '❌ Error occurred';
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            console.error('API call error:', error);
+            showVoiceResponse(`❌ Error: Unable to connect to server. Please try again.`);
+            document.getElementById('voiceStatus').textContent = '❌ Connection error';
+        });
+}
+
+function handleAllocateRoomCommand(command, timeoutId) {
+    // Extract patient name
+    const nameMatch = command.match(/allocate.*?for patient (\w+)/i);
+    const patientName = nameMatch ? nameMatch[1] : 'Unknown';
+    
+    showVoiceResponse(`🏨 Allocating VIP room for patient ${patientName}...`);
+    
+    // Call the real API to allocate room
+    fetch('/api/allocate-room', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            patient_name: patientName,
+            room_type: 'VIP Room'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        clearTimeout(timeoutId);
+        
+        if (data.success) {
+            showVoiceResponse(`✅ Successfully allocated VIP room for patient ${patientName}!\n\n🏷️ Room Number: ${data.room_number}\n🛏️ Bed ID: ${data.bed_id}\n🏨 Room Type: ${data.room_type}\n📋 Status: ${data.status}\n✅ Check-in: Ready\n📅 Allocated: ${new Date().toLocaleDateString()}`);
+            
+            // Update the dashboard stats
+            updateBedStats();
+            
+            // Show success animation
+            document.getElementById('voiceStatus').textContent = `✅ Room allocated for ${patientName}!`;
+        } else {
+            if (data.message.includes('No available beds')) {
+                showVoiceResponse(`❌ No available beds at the moment!\n\n🏨 All beds are currently occupied\n⏰ Please try again later`);
+                document.getElementById('voiceStatus').textContent = `❌ No beds available`;
+            } else {
+                showVoiceResponse(`❌ Error allocating room: ${data.message}`);
+                document.getElementById('voiceStatus').textContent = `❌ Error occurred`;
+            }
+        }
+    })
+    .catch(error => {
+        clearTimeout(timeoutId);
+        console.error('API call error:', error);
+        showVoiceResponse(`❌ Error: Unable to connect to server. Please try again.`);
+        document.getElementById('voiceStatus').textContent = `❌ Connection error`;
+    });
+}
+
+function showVoiceResponse(response) {
+    const resultDiv = document.getElementById('voiceResult');
+    const responseDiv = document.getElementById('voiceResponse');
+    
+    // Convert newlines to HTML breaks for better formatting
+    const formattedResponse = response.replace(/\n/g, '<br>');
+    responseDiv.innerHTML = formattedResponse;
+    resultDiv.style.display = 'block';
+    
+    // Auto-hide after 15 seconds (increased for better readability)
+    setTimeout(() => {
+        resultDiv.style.display = 'none';
+    }, 15000);
+}
+</script>
+{% endblock %}

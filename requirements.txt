@@ -35,3 +35,10 @@ openpyxl==3.1.5
 # Ayurveda Chatbot
 streamlit==1.32.0
 PyPDF2==3.0.1
+
+# Alexa Integration
+websockets==11.0.3
+asyncio-mqtt==0.16.2
+
+# Testing
+websocket-client==1.8.0

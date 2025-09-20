@@ -2,7 +2,11 @@ import base64
 import os
 from datetime import datetime, timedelta
 import requests
+from bson import ObjectId
+from flask import Flask, jsonify, request
+from pymongo import MongoClient
 
+# === Your original Zoom integration code, unchanged ===
 
 ZOOM_ACCOUNT_ID = os.getenv('ZOOM_ACCOUNT_ID', '')
 ZOOM_CLIENT_ID = os.getenv('ZOOM_CLIENT_ID', '')
@@ -73,19 +77,14 @@ def create_zoom_meeting(topic: str, start_time_iso: str, duration_minutes: int =
 
 def build_iso_time_for_today(slot_time: str, timezone: str = 'Asia/Kolkata') -> str:
     """Build ISO8601 start_time for today's date and given HH:MM slot in IST by default."""
-    # Expect slot_time like '18:00' or '18:15'
     today = datetime.now()
     hour, minute = [int(x) for x in slot_time.split(':')]
     local_dt = today.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    # Zoom expects RFC3339. We'll append timezone name separately in request.
     return local_dt.strftime('%Y-%m-%dT%H:%M:%S')
 
 
 def end_zoom_meeting(meeting_id: int) -> bool:
-    """End a running Zoom meeting using Zoom's 'update meeting status' API.
-
-    If the S2S token is valid and the meeting exists, Zoom will end it and return 204.
-    """
+    """End a running Zoom meeting using Zoom's 'update meeting status' API."""
     token = _get_access_token()
     url = f'https://api.zoom.us/v2/meetings/{meeting_id}/status'
     headers = {
@@ -94,7 +93,51 @@ def end_zoom_meeting(meeting_id: int) -> bool:
     }
     payload = {'action': 'end'}
     resp = requests.put(url, json=payload, headers=headers, timeout=20)
-    # Zoom typically returns 204 No Content on success
     return resp.status_code in (200, 204)
 
 
+# === MongoDB setup (example) ===
+app = Flask(__name__)
+client = MongoClient(os.getenv('MONGO_URI', 'mongodb://localhost:27017'))
+db = client['your_database_name']  # change to your DB
+
+
+# === New helper to fix ObjectId JSON serialization ===
+def serialize_mongo_doc(doc: dict) -> dict:
+    """Convert ObjectId fields in a MongoDB document to strings for JSON serialization."""
+    return {
+        key: str(value) if isinstance(value, ObjectId) else value
+        for key, value in doc.items()
+    }
+
+
+# === Example API route to book a Zoom meeting and save to Mongo ===
+@app.route('/api/book_meeting', methods=['POST'])
+def book_meeting():
+    data = request.json
+    slot = data.get('slot_time')
+    if not slot:
+        return jsonify({'error': 'Missing slot_time parameter'}), 400
+
+    topic = "Dermatology Consultation"
+    start_time = build_iso_time_for_today(slot)
+
+    try:
+        zoom_data = create_zoom_meeting(topic, start_time)
+    except Exception as e:
+        return jsonify({'error': f'Zoom API error: {str(e)}'}), 500
+
+    meeting_doc = {
+        'topic': topic,
+        'start_time': start_time,
+        'zoom': zoom_data
+    }
+
+    inserted = db.bookings.insert_one(meeting_doc)
+    meeting_doc['_id'] = inserted.inserted_id
+
+    return jsonify(serialize_mongo_doc(meeting_doc))
+
+
+if __name__ == '__main__':
+    app.run(debug=True)

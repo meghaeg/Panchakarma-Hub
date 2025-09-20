@@ -1,0 +1,65 @@
+{
+  "timestamp": "2025-09-18T02:41:57.403563",
+  "summary": {
+    "total": 9,
+    "passed": 7,
+    "failed": 2
+  },
+  "tests": [
+    {
+      "test": "Dashboard Stats API",
+      "success": false,
+      "message": "('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))",
+      "timestamp": "2025-09-18T02:41:25.999329"
+    },
+    {
+      "test": "Bed Statistics API",
+      "success": true,
+      "message": "Total beds: 0",
+      "timestamp": "2025-09-18T02:41:31.595857"
+    },
+    {
+      "test": "Recent Activities API",
+      "success": true,
+      "message": "Retrieved 1 activities",
+      "timestamp": "2025-09-18T02:41:37.505336"
+    },
+    {
+      "test": "Alexa Connection Test",
+      "success": true,
+      "message": "Alexa integration is working",
+      "timestamp": "2025-09-18T02:41:42.196881"
+    },
+    {
+      "test": "Alexa Dashboard Page",
+      "success": false,
+      "message": "Page content not as expected",
+      "timestamp": "2025-09-18T02:41:48.344782"
+    },
+    {
+      "test": "Lambda Intent: AddDoctorIntent",
+      "success": true,
+      "message": "Event structure valid",
+      "timestamp": "2025-09-18T02:41:48.345579"
+    },
+    {
+      "test": "Lambda Intent: CheckBedIntent",
+      "success": true,
+      "message": "Event structure valid",
+      "timestamp": "2025-09-18T02:41:48.345961"
+    },
+    {
+      "test": "Lambda Intent: GetCentreStatusIntent",
+      "success": true,
+      "message": "Event structure valid",
+      "timestamp": "2025-09-18T02:41:48.346316"
+    },
+    {
+      "test": "Database Connectivity",
+      "success": true,
+      "message": "Database accessible with data",
+      "timestamp": "2025-09-18T02:41:57.386780"
+    }
+  ],
+  "websocket_messages": []
+}
